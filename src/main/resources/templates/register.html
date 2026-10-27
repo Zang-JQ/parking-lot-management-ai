@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - 停车场管理系统</title>
+    <script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            width: 400px;
+            padding: 28px 32px 22px;
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .login-header { text-align: center; margin-bottom: 28px; }
+        .login-header .logo { font-size: 42px; margin-bottom: 8px; }
+        .login-header h2 {
+            font-size: 22px; color: #1e3a8a; font-weight: bold; margin-bottom: 4px;
+        }
+        .login-header .sub { font-size: 13px; color: #94a3b8; }
+
+        .form-group { margin-bottom: 12px; }
+        .form-group label {
+            display: block; font-size: 13px; color: #475569;
+            margin-bottom: 6px; font-weight: 500;
+        }
+        .form-group label .required { color: #ef4444; }
+        .form-group input[type="text"],
+        .form-group input[type="password"],
+        .form-group input[type="tel"] {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #333;
+            transition: border-color .2s, box-shadow .2s;
+            font-family: inherit;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+        }
+
+        input[type="button"] {
+            width: 100%;
+            padding: 10px;
+            background: #1e3a8a;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .2s;
+            font-family: inherit;
+            margin-top: 4px;
+        }
+        input[type="button"]:hover { background: #1e40af; }
+
+        .login-link {
+            margin-top: 16px;
+            font-size: 13px;
+            color: #94a3b8;
+            text-align: center;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 12px;
+        }
+        .login-link a { color: #1e3a8a; font-weight: 600; }
+        .login-link a:hover { text-decoration: underline; }
+    </style>
+    <script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $("#btnRegister").click(function () {
+                let username = $("[name=username]").val();
+                let realname = $("[name=realname]").val();
+                let phone = $("[name=phone]").val();
+                let password = $("[name=password]").val();
+                let confirmPwd = $("[name=confirmPwd]").val();
+                if (!username) {
+                    alert("请输入账号！");
+                    return;
+                }
+                if (!realname) {
+                    alert("请输入真实姓名！");
+                    return;
+                }
+                if (!phone) {
+                    alert("请输入手机号！");
+                    return;
+                }
+                if (!password) {
+                    alert("请输入密码！");
+                    return;
+                }
+                if (password !== confirmPwd) {
+                    alert("两次输入的密码不一致！");
+                    return;
+                }
+                $.get("SysUser/addUser", {"username": username, "password": password, "realname": realname, "phone": phone, "role": "普通用户"}, function (data) {
+                    if (data) {
+                        alert("🎉 注册成功！请使用账号登录。");
+                        window.location.href = "login.html";
+                    } else {
+                        alert("注册失败，账号可能已存在！");
+                    }
+                });
+            });
+        });
+    </script>
+    <script type="text/javascript" src="../js/toast.js"></script>
+</head>
+<body>
+<div class="login-container">
+    <div class="login-header">
+        <div class="logo">🅿️</div>
+        <h2>停车场管理系统</h2>
+        <p class="sub">用户注册</p>
+    </div>
+
+    <div class="form-group">
+        <label>账号 <span class="required">*</span></label>
+        <input type="text" name="username" placeholder="请输入登录账号">
+    </div>
+    <div class="form-group">
+        <label>真实姓名 <span class="required">*</span></label>
+        <input type="text" name="realname" placeholder="请输入真实姓名">
+    </div>
+    <div class="form-group">
+        <label>手机号 <span class="required">*</span></label>
+        <input type="tel" name="phone" placeholder="请输入11位手机号" maxlength="11">
+    </div>
+    <div class="form-group">
+        <label>密码 <span class="required">*</span></label>
+        <input type="password" name="password" placeholder="不少于6位">
+    </div>
+    <div class="form-group">
+        <label>确认密码 <span class="required">*</span></label>
+        <input type="password" name="confirmPwd" placeholder="请再次输入密码">
+    </div>
+
+    <input type="button" value="立即注册" id="btnRegister">
+
+    <div class="login-link">
+        已有账号？<a href="login.html">返回登录</a>
+    </div>
+</div>
+</body>
+</html>

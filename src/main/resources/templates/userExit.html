@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车辆出场结算 - 停车场管理系统</title>
+    <script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            // ===== 自动高亮当前导航项（点谁谁变色，其他还原）=====
+            var currentPath = window.location.pathname;
+            var currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1).split('?')[0];
+            var navMap = {
+                'userSpots.html': 'li1',
+                'userEntry.html': 'li2',
+                'userExit.html': 'li3',
+                'userRecords.html': 'li4',
+                'userMembership.html': 'li5'
+            };
+            if (navMap[currentPage]) {
+                $("[name=" + navMap[currentPage] + "] a").addClass("active");
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            const username = params.get('username');
+            let userid = null; // 提升到外层作用域
+            // 缓存入场/出场时间字符串，用于计算时长与费用
+
+            // 侧边栏页面跳转
+            function bindSideBar(){
+                $("[name=li1]").click(function () {
+                    window.location.href = "userSpots.html?username="+username;
+                })
+                $("[name=li2]").click(function () {
+                    window.location.href = "userEntry.html?username="+username;
+                })
+                $("[name=li3]").click(function () {
+                    window.location.href = "userExit.html?username="+username;
+                })
+                $("[name=li4]").click(function () {
+                    window.location.href = "userRecords.html?username="+username;
+                })
+                $("[name=li5]").click(function () {
+                    window.location.href = "userMembership.html?username="+username;
+                })
+            }
+
+            // 获取登录用户信息（拿到 userid 后再加载停车记录和出场时间）
+            function loadUserInfo(){
+                $.get("SysUser/findByUsername",{"username":username},function(data){
+                    userid = data.t.id;
+                    $("[name=realname]").text(data.t.realname);
+                    loadParkingRecord();
+                });
+            }
+
+            // 加载当前用户的停车记录，填充车牌/车位/入场时间
+            function loadParkingRecord(){
+                $.get("ParkingRecord/findParkingRecordById",{"userid":userid},function(data){
+                    if(data){
+                        $("[name=platenumber]").text(data.platenumber);
+                        $("[name=spotcode]").text(data.spotcode);
+                        $("[name=entrytime]").text(data.entrytime);
+                    }
+                });
+            }
+
+            // 查询用户状态，控制出场按钮是否禁用
+            // 语义：stats="是"=可出场(按钮可用)；stats="否"=不可出场(按钮禁用)
+            function checkUserStatus(){
+                $.get("SysUser/findstatus",{"username":username},function(data){
+                    if(data=="是"){
+                        $("#btn").prop("disabled",false);
+                    }else if(data=="否"){
+                        $("#btn").prop("disabled",true);
+                    }
+                })
+            }
+
+            function loadServerTime(){
+                $.get("time/getTime",function(data){
+                    $("[name=exittime]").text(data);
+                    // 每秒刷新：重新计算停放时长和费用
+                    let entrytime = $("[name=entrytime]").text();
+                    if(entrytime){
+                        let minutes = calculateMinutes(entrytime, data);
+                        let fee = calculateFee(entrytime, data);
+                        let h = Math.floor(minutes / 60);
+                        let m = minutes % 60;
+                        $("[name=duration]").text(h > 0 ? h + "小时" + m + "分钟" : minutes + "分钟");
+                        $("[name=fee]").text("¥" + fee);
+                    }
+                })
+            }
+            // 出场结算提交【只绑定一次，点按钮才执行】
+            function bindExitBtn(){
+                $("#btn").click(function () {
+                    // 校验 userid 是否拿到
+                    if(userid === null){
+                        alert("用户信息尚未加载完成，请稍等！");
+                        return;
+                    }
+                    const $btn = $(this);
+                    // 防重复点击，禁用按钮
+                    $btn.prop("disabled",true);
+
+                    $.get("ParkingRecord/updateParkingRecord",{"userid":userid},function(data){
+                        if(data){
+                            alert("成功出场");
+                            // 刷新页面，显示结算后的状态
+                            location.reload();
+                        }else{
+                            alert("出场失败，请稍后重试");
+                            $btn.prop("disabled",false);
+                        }
+                    }).fail(function(){
+                        alert("提交失败，请检查网络");
+                        $btn.prop("disabled",false);
+                    })
+                })
+            }
+
+            /**
+             * 计算时间间隔（分钟）
+             * 注意：和后端 Duration.toMinutes() 一致，是【向下取整】
+             * 例如 1分01秒 → 1 分钟
+             */
+            function calculateMinutes(startTime, endTime){
+                // 兼容 "2026-09-06 21:24:24" 和 "2026-09-06T21:24:24" 两种格式
+                let s = new Date(String(startTime).replace(" ", "T"));
+                let e = new Date(String(endTime).replace(" ", "T"));
+                if(isNaN(s.getTime()) || isNaN(e.getTime())){
+                    return 0;
+                }
+                let diffMs = e.getTime() - s.getTime();
+                if(diffMs < 0){
+                    return 0;
+                }
+                return Math.floor(diffMs / 1000 / 60);
+            }
+
+            /**
+             * 计算单日（不足24小时）费用
+             * 15分钟免费；1小时内5元；每多1小时单价+1；单小时最高10；单日封顶60
+             */
+            function calcSingleDayFee(totalMinute){
+                if(totalMinute <= 15){
+                    return 0.0;
+                }
+                let totalHour = Math.ceil(totalMinute / 60);   // 向上取整，等价 Java 的 (totalMinute+59)/60
+                let sum = 0;
+                for(let i = 1; i <= totalHour; i++){
+                    let hourPrice = Math.min(5 + (i - 1), 10);  // 第i小时价格：5,6,7...,封顶10
+                    sum += hourPrice;
+                }
+                if(sum > 60.0){
+                    sum = 60.0;
+                }
+                return Math.round(sum * 100) / 100;
+            }
+
+            /**
+             * 总计费入口：直接返回费用（元）
+             */
+            function calculateFee(startTime, endTime){
+                let totalMinute = calculateMinutes(startTime, endTime);
+                if(totalMinute <= 15){
+                    return 0.0;
+                }
+                let oneDayMinute = 24 * 60;
+                let fullDayCount = Math.floor(totalMinute / oneDayMinute);   // 完整天数
+                let remainMinute = totalMinute % oneDayMinute;               // 不足24小时的分钟
+                let fullDayFee = 60.0 * fullDayCount;
+                let remainFee = calcSingleDayFee(remainMinute);
+                let totalFee = fullDayFee + remainFee;
+                return Math.round(totalFee * 100) / 100;
+            }
+
+
+
+            // 页面初始化入口
+            bindSideBar();
+            loadUserInfo();
+            checkUserStatus();
+            bindExitBtn();
+            loadServerTime();
+            let timeTimer = setInterval(function(){
+                loadServerTime();
+            },1000);
+            $(window).unload(function(){
+                clearInterval(timeTimer);
+            })
+
+
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        button {
+            font-family: inherit;
+        }
+
+        input, select {
+            font-family: inherit;
+        }
+
+        .topbar {
+            height: 60px;
+            background: #0ea5e9;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+        }
+
+        .topbar .logo {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .topbar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 14px;
+        }
+
+        .topbar .user-info .role-tag {
+            background: #0369a1;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .logout-btn {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: inline-block;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .main-layout {
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 220px;
+            background: #1e293b;
+            flex-shrink: 0;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding-top: 10px;
+        }
+
+        .sidebar li a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 24px;
+            color: #cbd5e1;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+            transition: all .2s;
+        }
+
+        .sidebar li a:hover {
+            background: #334155;
+            color: #fff;
+        }
+
+        .sidebar li a.active {
+            background: #0ea5e9;
+            color: #fff;
+            border-left-color: #fff;
+        }
+
+        .sidebar li .icon {
+            width: 18px;
+            text-align: center;
+        }
+
+        .content {
+            flex: 1;
+            padding: 24px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+            border-left: 4px solid #0ea5e9;
+            padding-left: 12px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            display: inline-block;
+            cursor: default;
+        }
+
+        .btn-primary {
+            background: #0ea5e9;
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        .form-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            max-width: 600px;
+        }
+
+        .form-card .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #0ea5e9;
+        }
+
+        .settle-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            margin-top: 20px;
+            max-width: 600px;
+        }
+
+        .settle-card h3 {
+            margin-bottom: 16px;
+            color: #0ea5e9;
+        }
+
+        .settle-row {
+            display: flex;
+            padding: 10px 0;
+            border-bottom: 1px dashed #f0f0f0;
+            font-size: 14px;
+        }
+
+        .settle-row .k {
+            width: 110px;
+            color: #888;
+        }
+
+        .settle-row .v {
+            flex: 1;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .settle-row .fee {
+            color: #ef4444;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .pay-method {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .pay-option {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: default;
+        }
+
+        .pay-option.active {
+            border-color: #0ea5e9;
+            background: #f0f9ff;
+            color: #0ea5e9;
+            font-weight: bold;
+        }
+    </style>
+    <link rel="stylesheet" type="text/css" href="../css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+    <div class="logo">🅿️ 停车场管理系统</div>
+    <div class="user-info">
+        <span name="realname"></span>
+        <span class="role-tag">普通用户</span>
+        <a href="SysUser/logout" class="logout-btn">退出登录</a>
+    </div>
+</div>
+
+<div class="main-layout">
+    <div class="sidebar">
+        <ul>
+            <li name="li1"><a><span>🅿️</span><span>车位查询</span></a></li>
+            <li name="li2"><a><span>➡️</span><span>车辆入场登记</span></a></li>
+            <li name="li3"><a><span>⬅️</span><span>车辆出场结算</span></a></li>
+            <li name="li4"><a><span>📋</span><span>我的停车记录</span></a></li>
+            <li name="li5"><a><span>💳</span><span>充值会员</span></a></li>
+        </ul>
+    </div>
+
+    <div class="content">
+        <h2 class="page-title">车辆出场结算</h2>
+
+        <!-- 结算卡片：静态展示查询后的模拟结果 -->
+        <div class="settle-card">
+            <h3>📄 您的车辆结算信息</h3>
+            <div class="settle-row">
+                <div class="k">车牌号</div>
+                <div name="platenumber" class="v"></div>
+            </div>
+            <div class="settle-row">
+                <div class="k">车位</div>
+                <div name="spotcode" class="v"></div>
+            </div>
+            <div class="settle-row">
+                <div class="k">入场时间</div>
+                <div name="entrytime" class="v"></div>
+            </div>
+            <div class="settle-row">
+                <div class="k">出场时间</div>
+                <div name="exittime" class="v"></div>
+            </div>
+            <div class="settle-row">
+                <div class="k">停放时长</div>
+                <div name="duration" class="v"></div>
+            </div>
+            <div class="settle-row">
+                <div class="k">计费规则</div>
+                <div class="v">小型车标准费率（5元/小时，15分钟免费，单日封顶60元）</div>
+            </div>
+            <div class="settle-row">
+                <div class="k">应缴费用</div>
+                <div name="fee" class="v fee"></div>
+            </div>
+
+            <div style="margin-top: 16px;">
+                <label style="font-size: 14px; color: #555; margin-bottom: 8px; display: block;">支付方式</label>
+                <div class="pay-method">
+                    <div class="pay-option active" style="width:100%;">💚 微信支付</div>
+                </div>
+            </div>
+
+            <div style="margin-top:18px;text-align:right;">
+                <button id="btn" class="btn btn-danger">确认支付并出场</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="../js/assistant.js"></script>
+</body>
+</html>

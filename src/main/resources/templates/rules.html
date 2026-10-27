@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>费率规则管理 - 停车场管理系统</title>
+    <script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+    <script>
+        $(document).ready(function () {
+            // ===== 自动高亮当前导航项（点谁谁变色，其他还原）=====
+            var currentPath = window.location.pathname;
+            var currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1).split('?')[0];
+            var navMap = {
+                'dashboard.html': 'li1',
+                'spots.html': 'li2',
+                'rules.html': 'li3',
+                'records.html': 'li4',
+                'members.html': 'li5',
+                'reports.html': 'li6',
+                'settings.html': 'li7'
+            };
+            if (navMap[currentPage]) {
+                $("[name=" + navMap[currentPage] + "] a").addClass("active");
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            const username = params.get('username');
+            let userid = null; // 提升到外层作用域         // 侧边栏页面跳转
+            function bindSideBar(){
+                $("[name=li1]").click(function () {
+                    window.location.href = "dashboard.html?username="+username;
+                })
+                $("[name=li2]").click(function () {
+                    window.location.href = "spots.html?username="+username;
+                })
+                $("[name=li3]").click(function () {
+                    window.location.href = "rules.html?username="+username;
+                })
+                $("[name=li4]").click(function () {
+                    window.location.href = "records.html?username="+username;
+                })
+                $("[name=li5]").click(function () {
+                    window.location.href = "members.html?username="+username;
+                })
+                $("[name=li6]").click(function () {
+                    window.location.href = "reports.html?username="+username;
+                })
+                $("[name=li7]").click(function () {
+                    window.location.href = "settings.html?username="+username;
+                })
+            }
+            bindSideBar();
+        })
+    </script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif; background: #f0f2f5; color: #333; }
+  a { text-decoration: none; color: inherit; }
+  button { font-family: inherit; }
+
+  .topbar {
+    height: 60px; background: #1e3a8a; color: #fff;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 100;
+  }
+  .topbar .logo { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+  .topbar .user-info { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+  .topbar .user-info .role-tag { background: #3b82f6; padding: 2px 10px; border-radius: 10px; font-size: 12px; }
+  .logout-btn {
+    background: #ef4444; color: #fff; border: none; padding: 6px 16px; border-radius: 4px;
+    font-size: 13px; display: inline-block;
+  }
+  .logout-btn:hover { background: #dc2626; }
+
+  .main-layout { display: flex; min-height: calc(100vh - 60px); }
+  .sidebar { width: 220px; background: #1e293b; flex-shrink: 0; }
+  .sidebar ul { list-style: none; padding-top: 10px; }
+  .sidebar li a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 24px; color: #cbd5e1; font-size: 14px;
+    border-left: 3px solid transparent; transition: all .2s;
+  }
+  .sidebar li a:hover { background: #334155; color: #fff; }
+  .sidebar li a.active { background: #3b82f6; color: #fff; border-left-color: #fff; }
+  .sidebar li .icon { width: 18px; text-align: center; }
+
+  .content { flex: 1; padding: 24px; }
+  .page-title { font-size: 20px; margin-bottom: 20px; color: #333; border-left: 4px solid #3b82f6; padding-left: 12px; }
+
+  .btn { padding: 8px 16px; border: none; border-radius: 4px; font-size: 13px; display: inline-block; cursor: default; }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* 费率卡片 */
+  .rule-card {
+    background: #fff; border-radius: 8px; padding: 28px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); max-width: 620px;
+  }
+  .rule-card-header {
+    display: flex; align-items: center; gap: 10px;
+    padding-bottom: 18px; margin-bottom: 20px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .rule-card-header .rh-icon { font-size: 26px; }
+  .rule-card-header h3 { font-size: 18px; color: #1e3a8a; }
+  .rule-card-header .rh-tag {
+    background: #dbeafe; color: #1e40af; padding: 2px 10px;
+    border-radius: 10px; font-size: 12px; margin-left: auto;
+  }
+
+  /* 阶梯费率列表 */
+  .tier-list { margin-bottom: 20px; }
+  .tier-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 0; border-bottom: 1px dashed #f0f0f0;
+  }
+  .tier-row:last-child { border-bottom: none; }
+  .tier-row .tier-no {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #1e3a8a; color: #fff; font-size: 14px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .tier-row .tier-no.free { background: #22c55e; }
+  .tier-row .tier-no.cap { background: #f97316; }
+  .tier-row .tier-info { flex: 1; }
+  .tier-row .tier-info .tier-time { font-size: 14px; color: #333; font-weight: 600; }
+  .tier-row .tier-info .tier-desc { font-size: 12px; color: #999; margin-top: 3px; }
+  .tier-row .tier-price { font-size: 18px; font-weight: bold; color: #ef4444; white-space: nowrap; }
+  .tier-row .tier-price.free { color: #22c55e; }
+  .rule-note {
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px;
+    padding: 12px 14px; margin-bottom: 20px; font-size: 13px; color: #92400e; line-height: 1.8;
+  }
+  .rule-actions { padding-top: 16px; border-top: 1px solid #f0f0f0; display: flex; gap: 10px; }
+</style>
+    <link rel="stylesheet" type="text/css" href="../css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🅿️ 停车场管理系统</div>
+  <div class="user-info">
+    <span>系统管理员</span>
+    <span class="role-tag">管理员</span>
+    <a href="SysUser/logout" class="logout-btn">退出登录</a>
+  </div>
+</div>
+
+<div class="main-layout">
+  <div class="sidebar">
+    <ul>
+        <li name="li1"><a><span class="icon">📊</span><span>首页仪表盘</span></a></li>
+        <li name="li2"><a><span class="icon">🅿️</span><span>车位管理</span></a></li>
+        <li name="li3"><a><span class="icon">💰</span><span>费率规则管理</span></a></li>
+        <li name="li4"><a><span class="icon">📋</span><span>停车记录查询</span></a></li>
+        <li name="li5"><a><span class="icon">💳</span><span>会员管理</span></a></li>
+        <li name="li6"><a><span class="icon">📈</span><span>收费统计报表</span></a></li>
+        <li name="li7"><a><span class="icon">⚙️</span><span>系统设置</span></a></li>
+    </ul>
+  </div>
+
+  <div class="content">
+    <h2 class="page-title">费率规则管理</h2>
+
+    <div class="dash-grid">
+      <div class="setting-card" style="max-width:none;">
+        <h3>标准费率规则<span class="chart-sub" name="updatedAt"></span></h3>
+
+        <div class="form-group">
+          <label>规则名称</label>
+          <input type="text" id="rulename">
+        </div>
+        <div class="form-group">
+          <label>免费时长（分钟）</label>
+          <input type="number" id="freeminutes" min="0" max="1440">
+        </div>
+        <div class="form-group">
+          <label>首小时费用（元）</label>
+          <input type="number" id="firsthourfee" step="0.5" min="0">
+        </div>
+        <div class="form-group">
+          <label>每多一小时递增（元）</label>
+          <input type="number" id="incrementalfee" step="0.5" min="0">
+        </div>
+        <div class="form-group">
+          <label>每小时封顶（元）</label>
+          <input type="number" id="maxhourfee" step="0.5" min="0">
+        </div>
+        <div class="form-group">
+          <label>每日封顶（元）</label>
+          <input type="number" id="maxdayfee" step="1" min="0">
+        </div>
+
+        <button class="btn btn-primary" id="btnSave">保存费率规则</button>
+        <button class="btn btn-default" id="btnReset" style="margin-left:8px;">还原</button>
+      </div>
+
+      <div class="chart-box">
+        <h3>计费试算<span class="chart-sub">按左边填写的规则实时计算</span></h3>
+        <table>
+          <thead>
+          <tr><th>停车时长</th><th>应收费用</th></tr>
+          </thead>
+          <tbody name="preview"></tbody>
+        </table>
+        <div class="chart-sub" style="margin-top:10px;line-height:1.8;">
+          公式与后台一致：超出免费时长后按小时累计、每小时封顶、每日封顶，满 24 小时拆天累加。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+<script type="text/javascript" src="../js/toast.js"></script>
+<script type="text/javascript" src="../js/admin-shell.js"></script>
+<script>
+  (function () {
+    var loaded = null;          // 库里当前规则
+    var FIELDS = ['rulename', 'freeminutes', 'firsthourfee', 'incrementalfee', 'maxhourfee', 'maxdayfee'];
+    var PREVIEW = [
+      {label: '10 分钟', minutes: 10},
+      {label: '30 分钟', minutes: 30},
+      {label: '1 小时', minutes: 60},
+      {label: '2 小时', minutes: 120},
+      {label: '3 小时', minutes: 180},
+      {label: '6 小时', minutes: 360},
+      {label: '12 小时', minutes: 720},
+      {label: '23 小时 59 分', minutes: 1439},
+      {label: '25 小时', minutes: 1500}
+    ];
+
+    /** 和后台 ParkingFeeUtil 完全一致的算法，只用于试算展示 */
+    function calcFee(minutes, r) {
+      if (minutes <= r.freeminutes) return 0;
+      var day = 24 * 60;
+      var fullDays = Math.floor(minutes / day);
+      var remain = minutes % day;
+      var fee = r.maxdayfee * fullDays;
+      if (remain > r.freeminutes) {
+        var hours = Math.ceil(remain / 60);
+        var sum = 0;
+        for (var i = 1; i <= hours; i++) {
+          sum += Math.min(r.firsthourfee + (i - 1) * r.incrementalfee, r.maxhourfee);
+        }
+        fee += Math.min(sum, r.maxdayfee);
+      }
+      return Math.round(fee * 100) / 100;
+    }
+
+    function readForm() {
+      var rule = {
+        id: loaded ? loaded.id : 1,
+        rulename: $('#rulename').val(),
+        freeminutes: Number($('#freeminutes').val()),
+        firsthourfee: Number($('#firsthourfee').val()),
+        incrementalfee: Number($('#incrementalfee').val()),
+        maxhourfee: Number($('#maxhourfee').val()),
+        maxdayfee: Number($('#maxdayfee').val())
+      };
+      return rule;
+    }
+
+    function renderPreview() {
+      var rule = readForm();
+      var $body = $('[name=preview]').empty();
+      PREVIEW.forEach(function (item) {
+        var fee = calcFee(item.minutes, rule);
+        var text = fee === 0 ? '<span class="tag tag-green">免费</span>' : ('¥ ' + fee.toFixed(2));
+        $('<tr><td>' + item.label + '</td><td>' + text + '</td></tr>').appendTo($body);
+      });
+    }
+
+    function fill(rule) {
+      loaded = rule;
+      FIELDS.forEach(function (f) { $('#' + f).val(rule[f]); });
+      renderPreview();
+    }
+
+    function load() {
+      fetch('FeeRule/get')
+        .then(function (r) { return r.json(); })
+        .then(function (rule) {
+          fill(rule);
+          $('[name=updatedAt]').text('当前生效规则');
+        })
+        .catch(function () { toast('费率规则加载失败', 'err'); });
+    }
+
+    $(document).ready(function () {
+      bindNav('rules');
+      $('input').on('input change', renderPreview);
+      $('#btnReset').click(function () {
+        if (loaded) { fill(loaded); toast('已还原为库里的规则', 'info'); }
+      });
+      $('#btnSave').click(function () {
+        var rule = readForm();
+        if (rule.maxhourfee < rule.firsthourfee) {
+          toast('每小时封顶不能低于首小时费用', 'err');
+          return;
+        }
+        var body = $.param(rule);
+        $.post('FeeRule/save', body, function (res) {
+          if (res && res.success) {
+            toast(res.message);
+            load();
+          } else {
+            toast((res && res.message) || '保存失败', 'err');
+          }
+        }).fail(function () { toast('提交失败，请检查网络', 'err'); });
+      });
+      load();
+    });
+  })();
+</script>
+</body>
+</html>

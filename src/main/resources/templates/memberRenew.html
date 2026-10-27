@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>续费充值 - 会员中心</title>
+    <script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            // ===== 自动高亮当前导航项（点谁谁亮，其他还原）=====
+            var currentPath = window.location.pathname;
+            var currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1).split('?')[0];
+            var navMap = {
+                'memberCenter.html': 'li1',
+                'memberEntry.html': 'li2',
+                'memberExit.html': 'li3',
+                'memberRecords.html': 'li4',
+                'memberRenew.html': 'li5'
+            };
+            if (navMap[currentPage]) {
+                $("[name=" + navMap[currentPage] + "] a").addClass("active");
+            }
+            const params = new URLSearchParams(window.location.search);
+            const username = params.get('username');
+            let userid = null; // 提升到外层作用域
+            // 侧边栏跳转
+            $("[name=li1]").click(function () {
+                window.location.href = "memberCenter.html?username="+username;
+            })
+            $("[name=li2]").click(function () {
+                window.location.href = "memberEntry.html?username="+username;
+            })
+            $("[name=li3]").click(function () {
+                window.location.href = "memberExit.html?username="+username;
+            })
+            $("[name=li4]").click(function () {
+                window.location.href = "memberRecords.html?username="+username;
+            })
+            $("[name=li5]").click(function () {
+                window.location.href = "memberRenew.html?username="+username;
+            })
+            // 获取用户信息（拿到 userid 备用）
+            $.get("SysUser/findByUsername",{"username":username},function(data) {
+                $("[name=realname]").text(data.t.realname);
+                userid = data.t.id;
+                getdata()
+                $("#btn").click(function (){
+                    if(!confirm("确认续费月卡会员？\n续费时长：一个月\n应付金额：¥200.00")){
+                        return;
+                    }
+                    addexpiredate()
+                });
+            });
+            function getdata(){
+                $.get("Member/findMemberByUserId",{"userid":userid},function(data1){
+
+                });
+            }
+            function addexpiredate(){
+                $.get("Member/updateaddexpiredate",{"userid":userid},function(data){
+                    if(data){
+                        $.get("Member/findMemberByUserId",{"userid":userid},function(data1){
+                            expiredate=data1.expiredate;
+                            alert("续费成功,会员有效期延长至"+expiredate);
+                            getdata();
+                        })
+                    }
+                })
+            }
+        });
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif; background: #f0f2f5; color: #333; }
+        a { text-decoration: none; color: inherit; }
+        button { font-family: inherit; }
+        input, select { font-family: inherit; }
+
+        .topbar {
+            height: 60px; background: #f59e0b; color: #fff;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 100;
+        }
+        .topbar .logo { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+        .topbar .user-info { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+        .topbar .user-info .role-tag { background: #d97706; padding: 2px 10px; border-radius: 10px; font-size: 12px; }
+        .logout-btn {
+            background: #ef4444; color: #fff; border: none; padding: 6px 16px; border-radius: 4px;
+            font-size: 13px; display: inline-block;
+        }
+        .logout-btn:hover { background: #dc2626; }
+
+        .main-layout { display: flex; min-height: calc(100vh - 60px); }
+        .sidebar { width: 220px; background: #1e293b; flex-shrink: 0; }
+        .sidebar ul { list-style: none; padding-top: 10px; }
+        .sidebar li a {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 24px; color: #cbd5e1; font-size: 14px;
+            border-left: 3px solid transparent; transition: all .2s;
+        }
+        .sidebar li a:hover { background: #334155; color: #fff; }
+        .sidebar li a.active { background: #f59e0b; color: #fff; border-left-color: #fff; }
+        .sidebar li .icon { width: 18px; text-align: center; }
+
+        .content { flex: 1; padding: 24px; }
+        .page-title { font-size: 20px; margin-bottom: 20px; color: #333; border-left: 4px solid #f59e0b; padding-left: 12px; }
+
+        /* 当前会员状态 */
+        .current-box { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
+        .current-box h3 { color: #92400e; margin-bottom: 6px; }
+        .current-box p { font-size: 13px; color: #666; }
+        .current-box .status-tag { background: #f0fdf4; color: #22c55e; border: 1px solid #bbf7d0; padding: 4px 12px; border-radius: 10px; font-size: 13px; }
+
+        /* 左右布局容器 - 套餐卡 + 支付卡（等高对齐） */
+        .card-row {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 24px;
+            align-items: stretch;
+        }
+
+        /* 卡类型选择 */
+        .plans { flex: 1; min-width: 0; }
+        .plan-card {
+            background: #fff; border-radius: 16px; padding: 32px 28px; text-align: center;
+            border: 2px solid #e5e7eb; transition: all .3s ease; cursor: default; position: relative;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06); height: 100%; box-sizing: border-box;
+        }
+        .plan-card:hover { border-color: #f59e0b; transform: translateY(-6px); box-shadow: 0 16px 36px rgba(245,158,11,0.18); }
+        .plan-card.recommended { border-color: #f59e0b; background: linear-gradient(180deg, #fffbeb 0%, #ffffff 30%); }
+        .plan-card .badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; padding: 4px 18px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 4px 12px rgba(245,158,11,0.4); }
+        .plan-card .pc-icon { font-size: 48px; margin-bottom: 14px; display: inline-block; }
+        .plan-card h3 { font-size: 20px; color: #1e293b; margin-bottom: 6px; }
+        .plan-card .pc-period { font-size: 13px; color: #888; margin-bottom: 18px; }
+        .plan-card .pc-price { font-size: 38px; font-weight: bold; color: #f59e0b; margin-bottom: 4px; line-height: 1; }
+        .plan-card .pc-price small { font-size: 16px; color: #f59e0b; font-weight: normal; }
+        .plan-card .pc-discount { display: inline-block; background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 10px; font-size: 12px; margin-bottom: 18px; }
+        .plan-card ul { list-style: none; text-align: left; margin-top: 20px; }
+        .plan-card ul li { font-size: 13px; color: #555; padding: 6px 0; display: flex; align-items: center; gap: 8px; }
+        .plan-card ul li::before { content: "✓"; color: #22c55e; font-weight: bold; background: #f0fdf4; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+
+        /* 续费说明 */
+        .renew-tip { background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fde68a; border-radius: 12px; padding: 18px 22px; margin-bottom: 24px; font-size: 13px; color: #92400e; line-height: 2; }
+        .renew-tip h4 { margin-bottom: 8px; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+
+        /* 支付确认 */
+        .pay-box { background: #fff; border-radius: 16px; padding: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); flex: 1; min-width: 0; }
+        .pay-box h3 { margin-bottom: 20px; color: #1e293b; font-size: 18px; display: flex; align-items: center; gap: 8px; padding-bottom: 14px; border-bottom: 2px solid #f0f0f0; }
+        .pay-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed #f0f0f0; font-size: 14px; }
+        .pay-row .k { color: #888; }
+        .pay-row .v { color: #333; font-weight: 500; }
+        .pay-row .total { color: #ef4444; font-size: 22px; font-weight: bold; }
+        .pay-method { display: flex; gap: 10px; margin-top: 20px; margin-bottom: 20px; }
+        .pay-option { flex: 1; padding: 12px 8px; text-align: center; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 13px; cursor: default; }
+        .pay-option.active { border-color: #f59e0b; background: #fffbeb; color: #f59e0b; font-weight: bold; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 15px; display: inline-block; cursor: pointer; transition: all .2s; }
+        .btn-pay { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; width: 100%; font-weight: bold; box-shadow: 0 4px 14px rgba(245,158,11,0.4); }
+        .btn-pay:hover { background: linear-gradient(135deg, #d97706, #b45309); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(245,158,11,0.5); }
+
+        /* 响应式：窄屏时左右布局改为上下堆叠 */
+        @media (max-width: 900px) {
+            .card-row { flex-direction: column; }
+        }
+    </style>
+    <link rel="stylesheet" type="text/css" href="../css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+    <div class="logo">🅿️ 停车场管理系统</div>
+    <div class="user-info">
+        <span name="realname"></span>
+        <span class="role-tag">会员</span>
+        <a href="SysUser/logout" class="logout-btn">退出登录</a>
+    </div>
+</div>
+
+<div class="main-layout">
+    <div class="sidebar">
+        <ul>
+            <li name="li1"><a><span>🅿️</span><span>会员主页</span></a></li>
+            <li name="li2"><a><span>➡️</span><span>车辆入场登记</span></a></li>
+            <li name="li3"><a><span>⬅️</span><span>车辆出场结算</span></a></li>
+            <li name="li4"><a><span>📋</span><span>我的停车记录</span></a></li>
+            <li name="li5"><a><span>💳</span><span>缴费充值</span></a></li>
+        </ul>
+    </div>
+
+    <div class="content">
+        <h2 class="page-title">续费充值</h2>
+
+        <!-- 当前会员状态 -->
+        <div class="current-box">
+            <div>
+                <h3>💳 当前会员：会员</h3>
+                <p>会员编号：M001 | 绑定车牌：京B·88888 | 有效期至：2026-09-30</p>
+            </div>
+            <span class="status-tag">✅ 会员有效</span>
+        </div>
+
+        <!-- 续费说明 -->
+        <div class="renew-tip">
+            <h4>📌 续费规则说明</h4>
+            1. 续费将在当前会员到期日基础上累加时长（如当前2026-09-30到期，续费后新到期日为2026-10-30）；<br>
+            2. 会员有效期内可无限次免费停车，出入口快速通行放行；<br>
+            3. 续费支付成功后即时生效，无需等待。
+        </div>
+
+        <!-- 左右布局：套餐卡 + 支付卡 -->
+        <div class="card-row">
+            <!-- 会员套餐 -->
+            <div class="plans">
+                <div class="plan-card recommended">
+                    <div class="badge">✨ 推荐套餐</div>
+                    <div class="pc-icon">💳</div>
+                    <h3>月卡会员</h3>
+                    <div class="pc-period">30天有效期 · 即时生效</div>
+                    <div class="pc-price">¥200<small>/月</small></div>
+                    <div class="pc-discount">🎁 续费时长自动累加</div>
+                    <ul>
+                        <li>30天内无限次免费停车</li>
+                        <li>出入口快速通行放行</li>
+                        <li>VIP车位优先保障</li>
+                        <li>专属客服优先服务</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 支付确认 -->
+            <div class="pay-box">
+                <h3>💳 确认续费信息</h3>
+                <div class="pay-row"><span class="k">当前会员</span><span class="v">会员（M001）</span></div>
+                <div class="pay-row"><span class="k">当前到期日</span><span class="v">2026-09-30</span></div>
+                <div class="pay-row"><span class="k">选择套餐</span><span class="v">月卡会员（30天）</span></div>
+                <div class="pay-row"><span class="k">续费后到期日</span><span class="v">2026-10-30</span></div>
+                <div class="pay-row"><span class="k">应付金额</span><span class="v total">¥ 200.00</span></div>
+
+                <!-- 支付方式（固定微信支付） -->
+                <div style="margin-top: 20px;">
+                    <label style="font-size: 14px; color: #555; margin-bottom: 10px; display: block; font-weight: 600;">💰 支付方式</label>
+                    <div class="pay-method">
+                        <div class="pay-option active" style="width:100%;">� 微信支付</div>
+                    </div>
+                </div>
+
+                <button id="btn" class="btn btn-pay">立即续费 ¥200</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="../js/assistant.js"></script>
+</body>
+</html>

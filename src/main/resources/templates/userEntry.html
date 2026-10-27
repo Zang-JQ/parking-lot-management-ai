@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车辆入场登记 - 停车场管理系统</title>
+    <script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            // ===== 自动高亮当前导航项（点谁谁变色，其他还原）=====
+            var currentPath = window.location.pathname;
+            var currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1).split('?')[0];
+            var navMap = {
+                'userSpots.html': 'li1',
+                'userEntry.html': 'li2',
+                'userExit.html': 'li3',
+                'userRecords.html': 'li4',
+                'userMembership.html': 'li5'
+            };
+            if (navMap[currentPage]) {
+                $("[name=" + navMap[currentPage] + "] a").addClass("active");
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            const username = params.get('username');
+            let userid = null; // 提升到外层作用域         // 侧边栏页面跳转
+            function bindSideBar(){
+                $("[name=li1]").click(function () {
+                    window.location.href = "userSpots.html?username="+username;
+                })
+                $("[name=li2]").click(function () {
+                    window.location.href = "userEntry.html?username="+username;
+                })
+                $("[name=li3]").click(function () {
+                    window.location.href = "userExit.html?username="+username;
+                })
+                $("[name=li4]").click(function () {
+                    window.location.href = "userRecords.html?username="+username;
+                    $(this).css("class","");
+                })
+                $("[name=li5]").click(function () {
+                    window.location.href = "userMembership.html?username="+username;
+                })
+            }
+
+            // 获取登录用户信息
+            function loadUserInfo(){
+                $.get("SysUser/findByUsername",{"username":username},function(data){
+                    $("[name=realname]").text(data.t.realname);
+                    $("[name=realname]").val(data.t.realname);
+                    $("[name=phone]").val(data.t.phone);
+                    userid = data.t.id;
+                });
+            }
+
+            // 加载空闲车位下拉框
+            function loadFreeSpot(){
+                $.get("ParkingSpot/findfreeSpot",function(data){
+                    $("select[name=spotcode]").empty();
+                    for(var i=0; i<data.length; i++){
+                        $("<option value='"+data[i].spotcode+"'>"+data[i].spotcode+"</option>").appendTo("select[name=spotcode]");
+                    }
+                });
+            }
+
+            // 获取服务器入场时间
+            function loadServerTime(){
+                $.get("time/getTime",function(data){
+                    $("[name=entrytime]").val(data);
+                })
+            }
+
+            // 查询用户状态，控制按钮是否禁用
+            // 语义：stats="否"=同意入场(按钮可用)；stats="是"=不同意入场(按钮禁用)
+            function checkUserStatus(){
+                $.get("SysUser/findstatus",{"username":username},function(data){
+                    if(data=="是"){
+                        // "是" = 不同意入场 → 禁用按钮
+                        $("#btn").prop("disabled",true);
+                    }else{
+                        // 其他情况（"否"=同意入场）→ 按钮可用
+                        $("#btn").prop("disabled",false);
+                    }
+                })
+            }
+
+            // 入场提交【只绑定一次】
+            function bindSubmitBtn(){
+                $("#btn").click(function () {
+                    const $btn = $(this);
+                    // 校验userid是否拿到
+                    if(userid === null){
+                        alert("用户信息尚未加载完成，请稍等！");
+                        return;
+                    }
+                    let platenumber=$("[name=platenumber]").val().trim();
+                    let spotcode=$("[name=spotcode]").val();
+
+                    //表单非空校验
+                    if(!platenumber){
+                        alert("请输入车牌号");
+                        return;
+                    }
+                    if(!spotcode){
+                        alert("请选择车位");
+                        return;
+                    }
+
+                    //防重复提交，禁用按钮
+                    $btn.prop("disabled",true);
+
+                    $.get("ParkingRecord/addParkingRecord",{"userid":userid, "platenumber":platenumber, "spotcode":spotcode},function(data){
+                        if(data){
+                            alert("进场成功");
+                            loadFreeSpot();
+                            // 入场成功禁用按钮（用户已在停车场）
+                            $("#btn").prop("disabled",true);
+                        }else{
+                            alert("入场失败，请稍后重试");
+                            $("#btn").prop("disabled",false);
+                        }
+                    }).fail(function(){
+                        alert("提交失败，请检查网络");
+                        $("#btn").prop("disabled",false);
+                    })
+                })
+            }
+
+            /* ==================================================================
+             * 车牌照片识别（LangChain4j 多模态）
+             * 1. 选图/拍照 → 2. canvas 压缩（长边≤1280, JPEG 0.85）→ 3. POST Plate/recognize
+             * 4. 回填到车牌号输入框；失败只提示，不阻断手填
+             * ================================================================== */
+            function compressImage(file, maxSize, quality){
+                return new Promise(function (resolve, reject) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        const img = new Image();
+                        img.onload = function () {
+                            let w = img.width, h = img.height;
+                            const scale = Math.min(1, maxSize / Math.max(w, h));
+                            w = Math.max(1, Math.round(w * scale));
+                            h = Math.max(1, Math.round(h * scale));
+                            const canvas = document.createElement("canvas");
+                            canvas.width = w;
+                            canvas.height = h;
+                            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+                            canvas.toBlob(function (blob) {
+                                blob ? resolve(blob) : reject(new Error("图片处理失败"));
+                            }, "image/jpeg", quality);
+                        };
+                        img.onerror = function () { reject(new Error("图片加载失败")); };
+                        img.src = e.target.result;
+                    };
+                    reader.onerror = function () { reject(new Error("读取文件失败")); };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            function showRecognizeHint(text, type){
+                const $hint = $("#recognizeHint");
+                $hint.removeClass("ok warn err").addClass(type).text(text);
+            }
+
+            function recognizePlate(file){
+                const $btn = $("#btnRecognize");
+                const $plate = $("[name=platenumber]");
+
+                // 先本地预览，用户能看出是不是拍糊了
+                const previewUrl = URL.createObjectURL(file);
+                $("#platePreview").attr("src", previewUrl);
+                $("#previewBox").show();
+
+                $btn.prop("disabled", true).text("识别中…");
+                showRecognizeHint("正在上传照片并识别车牌，请稍候（通常 3~15 秒）…", "warn");
+
+                compressImage(file, 1280, 0.85).then(function (blob) {
+                    const fd = new FormData();
+                    fd.append("file", blob, "plate.jpg");
+                    const xhr = new XMLHttpRequest();
+                    xhr.open("POST", "Plate/recognize", true);
+                    xhr.timeout = 60000;
+
+                    xhr.onload = function () {
+                        $btn.prop("disabled", false).text("📷 拍照识别");
+                        let res = null;
+                        try { res = JSON.parse(xhr.responseText); } catch (e) { res = null; }
+                        if (!res) {
+                            showRecognizeHint("识别服务返回异常，请稍后重试，或手动输入车牌", "err");
+                            return;
+                        }
+                        if (res.success && res.plate) {
+                            $plate.val(res.plate);
+                            if (res.valid) {
+                                showRecognizeHint("✅ " + res.message, "ok");
+                            } else {
+                                showRecognizeHint("⚠️ " + res.message, "warn");
+                            }
+                        } else {
+                            showRecognizeHint("❌ " + (res.message || "没有识别到车牌，请重拍或手动输入"), "err");
+                        }
+                    };
+                    xhr.onerror = function () {
+                        $btn.prop("disabled", false).text("📷 拍照识别");
+                        showRecognizeHint("网络异常，识别失败，可以手动输入车牌", "err");
+                    };
+                    xhr.ontimeout = function () {
+                        $btn.prop("disabled", false).text("📷 拍照识别");
+                        showRecognizeHint("识别超时（60 秒），请换张清晰点的照片重试", "err");
+                    };
+                    xhr.send(fd);
+                }).catch(function (err) {
+                    $btn.prop("disabled", false).text("📷 拍照识别");
+                    showRecognizeHint("图片处理失败：" + err.message, "err");
+                });
+            }
+
+            function bindPlateRecognize(){
+                $("#btnRecognize").click(function () {
+                    $("#plateFile").val("");   // 允许重复选同一张图
+                    $("#plateFile").click();
+                });
+                $("#plateFile").change(function () {
+                    if (!this.files || this.files.length === 0) {
+                        return;
+                    }
+                    const file = this.files[0];
+                    if (!/^image\//.test(file.type)) {
+                        showRecognizeHint("请选择图片文件（jpg / png / heic 转码后的图片）", "err");
+                        return;
+                    }
+                    recognizePlate(file);
+                });
+            }
+
+            // 页面初始化入口
+            bindSideBar();
+            loadUserInfo();
+            loadFreeSpot();
+            loadServerTime();
+            let timeTimer = setInterval(function(){
+                loadServerTime();
+            },1000);
+            bindSubmitBtn();
+            bindPlateRecognize();
+            checkUserStatus();
+            $(window).unload(function(){
+                clearInterval(timeTimer);
+            })
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        button {
+            font-family: inherit;
+        }
+
+        input, select, textarea {
+            font-family: inherit;
+        }
+
+        .topbar {
+            height: 60px;
+            background: #0ea5e9;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+        }
+
+        .topbar .logo {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .topbar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 14px;
+        }
+
+        .topbar .user-info .role-tag {
+            background: #0369a1;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .logout-btn {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: inline-block;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .main-layout {
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 220px;
+            background: #1e293b;
+            flex-shrink: 0;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding-top: 10px;
+        }
+
+        .sidebar li a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 24px;
+            color: #cbd5e1;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+            transition: all .2s;
+        }
+
+        .sidebar li a:hover {
+            background: #334155;
+            color: #fff;
+        }
+
+        .sidebar li a.active {
+            background: #0ea5e9;
+            color: #fff;
+            border-left-color: #fff;
+        }
+
+        .sidebar li .icon {
+            width: 18px;
+            text-align: center;
+        }
+
+        .content {
+            flex: 1;
+            padding: 24px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+            border-left: 4px solid #0ea5e9;
+            padding-left: 12px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            display: inline-block;
+            cursor: default;
+        }
+
+        .btn-success {
+            background: #22c55e;
+            color: #fff;
+        }
+
+        .form-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            max-width: 600px;
+        }
+
+        .form-card .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #0ea5e9;
+        }
+
+        .entry-tip {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #92400e;
+            max-width: 600px;
+        }
+
+        /* ===== 车牌照片识别 ===== */
+        .plate-input-row {
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        .plate-input-row input {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .btn-scan {
+            flex-shrink: 0;
+            padding: 0 16px;
+            border: 1px solid #0ea5e9;
+            border-radius: 6px;
+            background: #f0f9ff;
+            color: #0369a1;
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all .2s;
+            font-family: inherit;
+        }
+
+        .btn-scan:hover:not(:disabled) {
+            background: #0ea5e9;
+            color: #fff;
+        }
+
+        .btn-scan:disabled {
+            opacity: .6;
+            cursor: default;
+        }
+
+        .recognize-hint {
+            margin-top: 8px;
+            font-size: 12.5px;
+            line-height: 1.6;
+            min-height: 18px;
+        }
+
+        .recognize-hint.ok { color: #15803d; }
+        .recognize-hint.warn { color: #b45309; }
+        .recognize-hint.err { color: #dc2626; }
+
+        .preview-box {
+            margin-top: 10px;
+        }
+
+        .preview-box img {
+            display: block;
+            max-width: 220px;
+            max-height: 150px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+    </style>
+    <link rel="stylesheet" type="text/css" href="../css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+    <div class="logo">🅿️ 停车场管理系统</div>
+    <div class="user-info">
+        <span name="realname"></span>
+        <span class="role-tag">普通用户</span>
+        <a href="SysUser/logout" class="logout-btn">退出登录</a>
+    </div>
+</div>
+
+<div class="main-layout">
+    <div class="sidebar">
+        <ul>
+            <li name="li1"><a><span>🅿️</span><span>车位查询</span></a></li>
+            <li name="li2"><a><span>➡️</span><span>车辆入场登记</span></a></li>
+            <li name="li3"><a><span>⬅️</span><span>车辆出场结算</span></a></li>
+            <li name="li4"><a><span>📋</span><span>我的停车记录</span></a></li>
+            <li name="li5"><a><span>💳</span><span>充值会员</span></a></li>
+        </ul>
+    </div>
+
+    <div class="content">
+        <h2 class="page-title">车辆入场登记</h2>
+        <div class="entry-tip">📝
+            请填写车辆信息并选择空闲车位，登记成功后系统将自动记录入场时间。临时车辆按小时计费（15分钟内免费）。<br>
+            也可以直接点「📷 拍照识别」，让 AI 从照片里读出车牌号并自动填入。
+        </div>
+        <div class="form-card">
+            <div class="form-group">
+                <label>车牌号</label>
+                <div class="plate-input-row">
+                    <input type="text" name="platenumber" value="">
+                    <button type="button" id="btnRecognize" class="btn-scan">📷 拍照识别</button>
+                </div>
+                <!-- 手机端优先唤起相机，桌面端就是选文件 -->
+                <input type="file" id="plateFile" accept="image/*" capture="environment" style="display:none;">
+                <div id="recognizeHint" class="recognize-hint"></div>
+                <div id="previewBox" class="preview-box" style="display:none;">
+                    <img id="platePreview" alt="车牌照片预览">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>车主姓名</label>
+                <input type="text" name="realname" value="">
+            </div>
+            <div class="form-group">
+                <label>联系电话</label>
+                <input type="text" name="phone" value="">
+            </div>
+            <div class="form-group">
+                <label>选择车位（仅显示空闲车位）</label>
+                <select name="spotcode"></select>
+            </div>
+            <div class="form-group">
+                <label>入场时间</label>
+                <input type="text" name="entrytime" value="" readonly>
+            </div>
+            <button id="btn" class="btn btn-success">✓ 确认入场</button>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="../js/assistant.js"></script>
+</body>
+</html>

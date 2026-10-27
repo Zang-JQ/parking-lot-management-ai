@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车辆入场 - 会员中心</title>
+    <script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            // ===== 自动高亮当前导航项（点谁谁亮，其他还原）=====
+            var currentPath = window.location.pathname;
+            var currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1).split('?')[0];
+            var navMap = {
+                'memberCenter.html': 'li1',
+                'memberEntry.html': 'li2',
+                'memberExit.html': 'li3',
+                'memberRecords.html': 'li4',
+                'memberRenew.html': 'li5'
+            };
+            if (navMap[currentPage]) {
+                $("[name=" + navMap[currentPage] + "] a").addClass("active");
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            const username = params.get('username');
+            let userid = null; // 提升到外层作用域
+
+            // 侧边栏跳转
+            function bindSideBar(){
+                $("[name=li1]").click(function () {
+                    window.location.href = "memberCenter.html?username=" + username;
+                })
+                $("[name=li2]").click(function () {
+                    window.location.href = "memberEntry.html?username=" + username;
+                })
+                $("[name=li3]").click(function () {
+                    window.location.href = "memberExit.html?username=" + username;
+                })
+                $("[name=li4]").click(function () {
+                    window.location.href = "memberRecords.html?username=" + username;
+                })
+                $("[name=li5]").click(function () {
+                    window.location.href = "memberRenew.html?username=" + username;
+                })
+            }
+
+            // 获取登录用户信息（拿到 userid 后再加载会员信息）
+            function loadUserInfo(){
+                $.get("SysUser/findByUsername", {"username": username}, function (data) {
+                    $("[name=realname]").text(data.t.realname);
+                    $("[name=mname]").val(data.t.realname);
+                    userid = data.t.id;
+                    loadMemberInfo();
+                });
+            }
+
+            // 加载会员信息（车牌下拉 + 有效期）
+            function loadMemberInfo(){
+                $.get("Member/findMemberByUserId",{"userid": userid}, function (data) {
+                    $("select[name=pnumber]").empty();
+                    if(data.platenumberstate=="否"){
+                        $("<option value='"+data.platenumber+"'>"+data.platenumber+"</option>").appendTo("select[name=pnumber]");
+                    }
+                    if(data.spareplatenumberstate=="否"){
+                        $("<option value='"+data.spareplatenumber+"'>"+data.spareplatenumber+"</option>").appendTo("select[name=pnumber]");
+                    }
+                    $("[name=status]").val("会员有效期至 : "+data.expiredate.substring(0,10));
+                    checkMemberStatus();
+                });
+            }
+
+            // 获取服务器入场时间
+            function loadServerTime(){
+                $.get("time/getTime",function (data){
+                    $("[name=entrytime]").val(data);
+                })
+            }
+
+            // 加载空闲车位下拉
+            function loadParkingSpot(){
+                $.get("ParkingSpot/findAllParkingSpot",function(data){
+                    $("select[name=spotcode]").empty();
+                    for(let i=0;i<data.length;i++){
+                        $("<option value='"+data[i].spotcode+"'>"+data[i].spotcode+"</option>").appendTo("select[name=spotcode]");
+                    }
+                })
+            }
+
+            // 查询车牌状态，控制按钮是否禁用
+            function checkMemberStatus(){
+                let platenumber = $("select[name=pnumber]").val();
+                if(!platenumber){
+                    $("#btn").prop("disabled",true);
+                    return;
+                }
+                $.get("Member/findplatenumberstateByplatenumber",{"platenumber":platenumber}, function (data) {
+                    if(data=="是"){
+                        alert("该车已在停车场中");
+                        $("#btn").prop("disabled",true);
+                    }else{
+                        $("#btn").prop("disabled",false);
+                    }
+                });
+            }
+
+            // 入场提交
+            function bindSubmitBtn(){
+                $("#btn").click(function () {
+                    const $btn = $(this);
+                    // 校验userid是否拿到
+                    if(userid === null){
+                        alert("用户信息尚未加载完成，请稍等！");
+                        return;
+                    }
+                    let platenumber=$("select[name=pnumber]").val();
+                    let spotcode=$("select[name=spotcode]").val();
+                    //表单非空校验
+                    if(!platenumber){
+                        alert("请选择车牌号");
+                        return;
+                    }
+                    if(!spotcode){
+                        alert("请选择车位");
+                        return;
+                    }
+
+                    //防重复提交，禁用按钮
+                    $btn.prop("disabled",true);
+
+                    $.get("ParkingRecord/addmemberParkingRecord",{"userid": userid,"platenumber":platenumber,"spotcode":spotcode},function (data) {
+                        if(data){
+                            alert(platenumber+"欢迎光临");
+                            // 入场成功后刷新车牌下拉（该车牌已在库，从下拉移除）
+                            loadMemberInfo();
+                            loadParkingSpot();
+                        }
+                    }).fail(function(){
+                        alert("提交失败，请检查网络");
+                        $btn.prop("disabled",false);
+                    })
+                });
+            }
+
+            // 切换车牌时检查状态
+            $("select[name=pnumber]").on("change",function(){
+                checkMemberStatus();
+            });
+
+            // 页面初始化入口
+            bindSideBar();
+            loadUserInfo();
+            loadServerTime();
+            loadParkingSpot();
+            let timeTimer = setInterval(function(){
+                loadServerTime();
+            },1000);
+            bindSubmitBtn();
+            checkMemberStatus();
+
+            $(window).unload(function(){
+                clearInterval(timeTimer);
+            })
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        button {
+            font-family: inherit;
+        }
+
+        input, select {
+            font-family: inherit;
+        }
+
+        .topbar {
+            height: 60px;
+            background: #f59e0b;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+        }
+
+        .topbar .logo {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .topbar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 14px;
+        }
+
+        .topbar .user-info .role-tag {
+            background: #d97706;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .logout-btn {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: inline-block;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .main-layout {
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 220px;
+            background: #1e293b;
+            flex-shrink: 0;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding-top: 10px;
+        }
+
+        .sidebar li a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 24px;
+            color: #cbd5e1;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+            transition: all .2s;
+        }
+
+        .sidebar li a:hover {
+            background: #334155;
+            color: #fff;
+        }
+
+        .sidebar li a.active {
+            background: #f59e0b;
+            color: #fff;
+            border-left-color: #fff;
+        }
+
+        .sidebar li .icon {
+            width: 18px;
+            text-align: center;
+        }
+
+        .content {
+            flex: 1;
+            padding: 24px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+            border-left: 4px solid #f59e0b;
+            padding-left: 12px;
+        }
+
+        /* 车牌识别区 */
+        .recog-box {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .recog-box .rb-icon {
+            font-size: 48px;
+        }
+
+        .recog-box .rb-info h3 {
+            color: #92400e;
+            margin-bottom: 6px;
+        }
+
+        .recog-box .rb-info p {
+            font-size: 13px;
+            color: #b45309;
+        }
+
+        .recog-box .rb-plate {
+            font-size: 22px;
+            font-weight: bold;
+            color: #92400e;
+            letter-spacing: 2px;
+        }
+
+        .form-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            max-width: 600px;
+        }
+
+        /* 费用行（与出场页一致） */
+        .settle-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed #f0f0f0;
+            font-size: 14px;
+        }
+        .settle-row .k {
+            width: 110px;
+            color: #888;
+        }
+        .settle-row .v {
+            flex: 1;
+            color: #333;
+            font-weight: 500;
+        }
+        .settle-row .v.fee {
+            color: #22c55e;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .form-card .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #f59e0b;
+        }
+
+        .form-group input[readonly] {
+            background: #f9fafb;
+            color: #666;
+        }
+
+        .free-tag {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 4px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: bold;
+            border: 1px solid #fde68a;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            display: inline-block;
+            cursor: default;
+            font-weight: bold;
+        }
+
+        .btn-success {
+            background: #22c55e;
+            color: #fff;
+        }
+
+        .btn-success:hover {
+            background: #16a34a;
+        }
+
+        .entry-tip {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #92400e;
+            max-width: 600px;
+        }
+    </style>
+    <link rel="stylesheet" type="text/css" href="../css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+    <div class="logo">🅿️ 停车场管理系统</div>
+    <div class="user-info">
+        <span name="realname"></span>
+        <span class="role-tag">会员</span>
+        <a href="SysUser/logout" class="logout-btn">退出登录</a>
+    </div>
+</div>
+
+<div class="main-layout">
+    <div class="sidebar">
+        <ul>
+            <li name="li1"><a><span>🅿️</span><span>会员主页</span></a></li>
+            <li name="li2"><a><span>➡️</span><span>车辆入场登记</span></a></li>
+            <li name="li3"><a><span>⬅️</span><span>车辆出场结算</span></a></li>
+            <li name="li4"><a><span>📋</span><span>我的停车记录</span></a></li>
+            <li name="li5"><a><span>💳</span><span>缴费充值</span></a></li>
+        </ul>
+    </div>
+
+    <div class="content">
+        <h2 class="page-title">车辆入场</h2>
+
+        <div class="entry-tip">📝 请选择绑定车牌号并选择空闲停车位后确认入场。会员有效期内免费停车，无需支付任何费用。</div>
+
+        <div class="form-card">
+            <div class="form-group">
+                <label>车牌号</label>
+                <select name="pnumber">
+                </select>
+            </div>
+            <div class="form-group">
+                <label>车主姓名</label>
+                <input name="mname" type="text" readonly>
+            </div>
+            <div class="form-group">
+                <label>会员状态</label>
+                <input name="status" type="text" readonly>
+            </div>
+            <div class="form-group">
+                <label>选择停车位（仅显示空闲车位）</label>
+                <select name="spotcode"></select>
+            </div>
+            <div class="form-group">
+                <label>入场时间</label>
+                <input name="entrytime" type="text" readonly>
+            </div>
+            <div class="settle-row">
+                <div class="k">停车费用</div>
+                <div class="v fee">🆓 会员免费</div>
+            </div>
+            <div style="margin-top:18px;text-align:right;">
+                <button id="btn" class="btn btn-success">✓ 确认免费入场</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="../js/assistant.js"></script>
+</body>
+</html>

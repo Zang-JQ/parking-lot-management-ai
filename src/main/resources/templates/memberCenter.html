@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会员中心 - 停车场管理系统</title>
+    <script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            // ===== 自动高亮当前导航项（点谁谁亮，其他还原）=====
+            var currentPath = window.location.pathname;
+            var currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1).split('?')[0];
+            var navMap = {
+                'memberCenter.html': 'li1',
+                'memberEntry.html': 'li2',
+                'memberExit.html': 'li3',
+                'memberRecords.html': 'li4',
+                'memberRenew.html': 'li5'
+            };
+            if (navMap[currentPage]) {
+                $("[name=" + navMap[currentPage] + "] a").addClass("active");
+            }
+            const params = new URLSearchParams(window.location.search);
+            const username = params.get('username');
+            let userid = null; // 提升到外层作用域
+            // 侧边栏跳转
+            $("[name=li1]").click(function () {
+                window.location.href = "memberCenter.html?username="+username;
+            })
+            $("[name=li2]").click(function () {
+                window.location.href = "memberEntry.html?username="+username;
+            })
+            $("[name=li3]").click(function () {
+                window.location.href = "memberExit.html?username="+username;
+            })
+            $("[name=li4]").click(function () {
+                window.location.href = "memberRecords.html?username="+username;
+            })
+            $("[name=li5]").click(function () {
+                window.location.href = "memberRenew.html?username="+username;
+            })
+            // 获取用户信息（拿到 userid 备用）
+            $.get("SysUser/findByUsername",{"username":username},function(data) {
+                $("[name=realname]").text(data.t.realname);
+                $("[name=realname1]").text(data.t.realname);
+                userid = data.t.id;
+                $.get("Member/findMemberByUserId",{"userid":userid},function(data) {
+                    $("[name=mid]").text("会员编号:"+data.id);
+                    $("[name=platenumber]").text("🚗"+data.platenumber);
+                    $("[name=spareplatenumber]").text("🚗"+data.spareplatenumber);
+                    $("[name=opendate]").text(data.opendate.substring(0,10));
+                    $("[name=expiredate]").text(data.expiredate.substring(0,10));
+                    $("[name=expiredate1]").text(data.expiredate.substring(0,10));
+                    if(data.avatar){
+                        $("#avatarBox").html('<img src="'+data.avatar+'" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">');
+                    }
+
+                })
+            });
+
+            // ===== 头像上传 =====
+            $("[name=uploadAvatarBtn]").click(function () {
+                $("[name=avatarFile]").click();
+            });
+            $("[name=avatarFile]").change(function () {
+                if (!this.files || this.files.length === 0) return;
+                var fd = new FormData();
+                fd.append("file", this.files[0]);
+                fd.append("userid", userid);
+                $.ajax({
+                    url: "Member/uploadAvatar",
+                    type: "POST",
+                    data: fd,
+                    processData: false,
+                    contentType: false,
+                    success: function (url) {
+                        if (url) {
+                            $("#avatarBox").html('<img src="'+url+'" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">');
+                            alert("头像上传成功");
+                        } else {
+                            alert("头像上传失败");
+                        }
+                    }
+                });
+            });
+
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        button {
+            font-family: inherit;
+        }
+
+        input, select {
+            font-family: inherit;
+        }
+
+        .topbar {
+            height: 60px;
+            background: #f59e0b;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+        }
+
+        .topbar .logo {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .topbar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 14px;
+        }
+
+        .topbar .user-info .role-tag {
+            background: #d97706;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .logout-btn {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: inline-block;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .main-layout {
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 220px;
+            background: #1e293b;
+            flex-shrink: 0;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding-top: 10px;
+        }
+
+        .sidebar li a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 24px;
+            color: #cbd5e1;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+            transition: all .2s;
+        }
+
+        .sidebar li a:hover {
+            background: #334155;
+            color: #fff;
+        }
+
+        .sidebar li a.active {
+            background: #f59e0b;
+            color: #fff;
+            border-left-color: #fff;
+        }
+
+        .sidebar li .icon {
+            width: 18px;
+            text-align: center;
+        }
+
+        .content {
+            flex: 1;
+            padding: 24px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+            border-left: 4px solid #f59e0b;
+            padding-left: 12px;
+        }
+
+        /* 会员信息卡 */
+        .member-card {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border-radius: 12px;
+            padding: 32px;
+            color: #fff;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .member-card .mc-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        /* 头像区域：圆形头像 + 下方上传按钮 */
+        .mc-avatar-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .member-card .mc-avatar {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.25);
+            border: 4px solid rgba(255, 255, 255, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            overflow: hidden;
+        }
+
+        .mc-upload-btn {
+            padding: 6px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all .2s;
+        }
+
+        .mc-upload-btn:hover {
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        .member-card h2 {
+            font-size: 22px;
+            margin-bottom: 6px;
+        }
+
+        .member-card .mc-no {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .member-card .mc-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .member-card .mc-tag {
+            background: rgba(255, 255, 255, 0.25);
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .member-card .mc-right {
+            text-align: right;
+        }
+
+        .member-card .mc-right .expire {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-bottom: 4px;
+        }
+
+        .member-card .mc-right .date {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        /* 到期提醒 */
+        .alert-box {
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        .alert-warning {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+        }
+
+        /* 到期信息 */
+        .expire-info {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            margin-bottom: 20px;
+        }
+
+        .expire-info h3 {
+            margin-bottom: 16px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .expire-detail {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .expire-item {
+            padding: 16px;
+            background: #fffbeb;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .expire-item .ei-label {
+            font-size: 13px;
+            color: #92400e;
+            margin-bottom: 6px;
+        }
+
+        .expire-item .ei-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #d97706;
+        }
+
+        /* 会员特权 */
+        .privilege-box {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            margin-bottom: 20px;
+        }
+
+        .privilege-box h3 {
+            margin-bottom: 16px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .privilege-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .privilege-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: #fffbeb;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #92400e;
+        }
+
+        .privilege-item .pi-icon {
+            font-size: 20px;
+        }
+
+    </style>
+    <link rel="stylesheet" type="text/css" href="../css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+    <div class="logo">🅿️ 停车场管理系统</div>
+    <div class="user-info">
+        <span name="realname"></span>
+        <span class="role-tag">会员</span>
+        <a href="SysUser/logout" class="logout-btn">退出登录</a>
+    </div>
+</div>
+
+<div class="main-layout">
+    <div class="sidebar">
+        <ul>
+            <li name="li1"><a><span>🅿️</span><span>会员主页</span></a></li>
+            <li name="li2"><a><span>➡️</span><span>车辆入场登记</span></a></li>
+            <li name="li3"><a><span>⬅️</span><span>车辆出场结算</span></a></li>
+            <li name="li4"><a><span>📋</span><span>我的停车记录</span></a></li>
+            <li name="li5"><a><span>💳</span><span>缴费充值</span></a></li>
+        </ul>
+    </div>
+
+    <div class="content">
+        <h2 class="page-title">会员中心</h2>
+
+        <!-- 会员信息卡 -->
+        <div class="member-card">
+            <div class="mc-left">
+                <div class="mc-avatar-section">
+                    <div class="mc-avatar" id="avatarBox">👤</div>
+                    <input type="file" name="avatarFile" accept="image/*" style="display:none;">
+                    <button name="uploadAvatarBtn" class="mc-upload-btn">📷 更换头像</button>
+                </div>
+                <div>
+                    <h2 name="realname1"></h2>
+                    <div name="mid" class="mc-no"></div>
+                    <div class="mc-tags">
+                        <span class="mc-tag">💳 会员</span>
+                        <span name="platenumber" class="mc-tag"></span>
+                        <span name="spareplatenumber" class="mc-tag"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="mc-right">
+                <div class="expire">有效期至</div>
+                <div name="expiredate1" class="date"></div>
+                <div class="mc-tag" style="margin-top: 8px;">✅ 会员有效</div>
+            </div>
+        </div>
+
+        <!-- 到期提醒 -->
+        <div class="alert-success">
+            ✅ 您的会员状态正常，期间可无限次免费停车。
+        </div>
+
+        <!-- 到期信息 -->
+        <div class="expire-info">
+            <h3>📅 会员到期信息</h3>
+            <div class="expire-detail">
+                <div class="expire-item">
+                    <div class="ei-label">开通日期</div>
+                    <div name="opendate" class="ei-value"></div>
+                </div>
+                <div class="expire-item">
+                    <div class="ei-label">到期日期</div>
+                    <div name="expiredate" class="ei-value"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 会员特权 -->
+        <div class="privilege-box">
+            <h3>🏆 会员专属特权</h3>
+            <div class="privilege-list">
+                <div class="privilege-item"><span class="pi-icon">🆓</span>期内无限次免费停车</div>
+                <div class="privilege-item"><span class="pi-icon">⚡</span>出入口快速通行放行</div>
+                <div class="privilege-item"><span class="pi-icon">🅿️</span>专属 VIP 车位优先保障</div>
+                <div class="privilege-item"><span class="pi-icon">🎁</span>节假日不限次免费停放</div>
+                <div class="privilege-item"><span class="pi-icon">📱</span>专属客服优先服务</div>
+                <div class="privilege-item"><span class="pi-icon">🔗</span>绑定车牌便捷入场</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script type="text/javascript" src="../js/assistant.js"></script>
+</body>
+</html>

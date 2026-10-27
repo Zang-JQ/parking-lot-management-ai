@@ -1,0 +1,1038 @@
+/* ==========================================================================
+   公共布局与视觉规范（所有业务页面最后加载，用来收敛各页内联样式）
+
+   设计取向：紧凑的信息密度 + 克制的装饰。
+     - 内容区居中、最大宽度 1240，两侧不留大片空白
+     - 统一 10px 圆角、细边框、极浅投影，表头带底色、偶数行浅色斑马纹
+     - 汇总/统计卡改成横向细条（标签 + 数字同一行），不再是两个大白块
+     - 表单、提示条、筛选栏整体收紧内边距
+     - 窄屏：表格自己滚、侧边栏折叠成顶部标签条
+   ========================================================================== */
+
+:root {
+    --app-bg: #f4f6fa;
+    --app-card: #ffffff;
+    --app-line: #e6eaf2;
+    --app-text: #1f2937;
+    --app-muted: #6b7280;
+    --app-radius: 10px;
+    --app-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px -18px rgba(16, 24, 40, .35);
+    --app-topbar-h: 60px;
+    --app-sidebar-w: 200px;
+    --app-content-max: 1240px;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    font-size: 14px;
+    color: var(--app-text);
+    background: var(--app-bg);
+}
+
+/* ---------- 顶栏 ---------- */
+body .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    height: var(--app-topbar-h);
+    padding: 0 20px;
+}
+
+body .topbar .logo {
+    font-size: 15px;
+}
+
+/* ---------- 侧边栏 ---------- */
+body .sidebar {
+    width: var(--app-sidebar-w);
+    flex: 0 0 var(--app-sidebar-w);
+    align-self: flex-start;
+    position: sticky;
+    top: var(--app-topbar-h);
+    height: calc(100vh - var(--app-topbar-h));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+body .sidebar li a {
+    padding: 11px 18px;
+    font-size: 13px;
+}
+
+/* ---------- 内容区：居中 + 最大宽度 ---------- */
+body .content {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    max-width: var(--app-content-max);
+    margin: 0 auto;
+    padding: 18px 22px 36px;
+}
+
+/* 只有一张表单卡的页面（入场/出场）：整列收窄，标题与卡片左边缘对齐 */
+body .content:has(> .form-card),
+body .content:has(> .settle-card) {
+    max-width: 760px;
+}
+
+body .content:has(> .form-card) > .form-card,
+body .content:has(> .settle-card) > .settle-card,
+body .content:has(> .form-card) > .entry-tip,
+body .content:has(> .settle-card) > .exit-tip {
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* ---------- 标题 ---------- */
+body .page-title {
+    font-size: 17px;
+    margin-bottom: 14px;
+    padding-left: 10px;
+    letter-spacing: .2px;
+}
+
+/* ---------- 卡片 ---------- */
+body .form-card,
+body .settle-card,
+body .chart-box,
+body .expire-info,
+body .privilege-box,
+body .pay-box,
+body .current-box,
+body .plan-card,
+body .setting-card,
+body .stat-card,
+body .sum-card,
+body .filter-bar,
+body .rule-card {
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-radius);
+    box-shadow: var(--app-shadow);
+}
+
+body .form-card,
+body .settle-card {
+    padding: 18px 20px;
+}
+
+body .chart-box,
+body .expire-info,
+body .privilege-box,
+body .pay-box,
+body .setting-card {
+    padding: 16px 18px;
+}
+
+/* ---------- 表单项：收紧间距 ---------- */
+body .form-group {
+    margin-bottom: 12px;
+}
+
+body .form-card .form-group {
+    margin-bottom: 12px;
+}
+
+body .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+}
+
+body .form-group input,
+body .form-group select,
+body .form-group textarea {
+    height: 38px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 13.5px;
+}
+
+/* ---------- 顶部提示条 ---------- */
+body .entry-tip,
+body .exit-tip,
+body .spot-tip {
+    padding: 9px 12px;
+    margin-bottom: 12px;
+    font-size: 12.5px;
+    line-height: 1.7;
+    border-radius: 8px;
+}
+
+/* 车牌识别提示为空时不要占位，否则车牌号和下一个字段之间会多出一截空白 */
+body .recognize-hint:empty {
+    display: none;
+}
+
+/* ---------- 汇总 / 统计卡：横向细条，不再是两个大白块 ---------- */
+body .summary-cards {
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+body .sum-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--pager-accent, #0ea5e9);
+}
+
+body .sum-card .label {
+    margin-bottom: 0;
+    font-size: 13px;
+}
+
+body .sum-card .value {
+    font-size: 20px;
+    line-height: 1.2;
+}
+
+body .stat-cards {
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+body .stat-card {
+    padding: 14px 16px;
+}
+
+body .stat-card .label {
+    margin-bottom: 6px;
+    font-size: 12.5px;
+}
+
+body .stat-card .value {
+    font-size: 22px;
+    line-height: 1.2;
+}
+
+/* ---------- 表格 ---------- */
+body table {
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-radius);
+    box-shadow: var(--app-shadow);
+}
+
+body thead {
+    background: #f5f8fc;
+}
+
+body th {
+    font-size: 12.5px;
+    letter-spacing: .3px;
+    font-weight: 600;
+    color: #475569;
+}
+
+body th,
+body td {
+    padding: 9px 12px;
+    font-size: 13.5px;
+}
+
+/* 浅色斑马纹，长表格更好扫读 */
+body tbody tr:nth-child(even) {
+    background: #fafbfe;
+}
+
+body tbody tr:hover {
+    background: #f0f9ff;
+}
+
+/* ---------- 筛选栏 ---------- */
+body .filter-bar {
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+/* ---------- 按钮 ---------- */
+body .btn,
+body .btn-scan,
+body input[type="button"],
+body input[type="submit"] {
+    border-radius: 8px;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+body .btn {
+    padding: 7px 14px;
+    font-size: 13px;
+}
+
+body .btn:not(.btn-disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px -10px rgba(16, 24, 40, .5);
+}
+
+/* ---------- 会员页：横幅与套餐卡收紧 ---------- */
+body .intro-banner {
+    padding: 22px 24px;
+    margin-bottom: 16px;
+    border-radius: 12px;
+}
+
+body .intro-banner h2 {
+    font-size: 21px;
+    margin-bottom: 8px;
+}
+
+body .intro-banner .privilege-tags {
+    margin-top: 12px;
+}
+
+body .card-row {
+    gap: 16px;
+    margin-bottom: 16px;
+    /* 不再让左右两栏强制等高：等高会把套餐卡撑出一大片空白 */
+    align-items: flex-start;
+}
+
+body .plan-card {
+    padding: 22px 20px;
+}
+
+body .plan-card ul {
+    margin-top: 14px;
+}
+
+body .plan-card ul li {
+    padding: 4px 0;
+}
+
+body .plan-card .pc-price {
+    font-size: 32px;
+}
+
+body .renew-tip {
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    line-height: 1.8;
+}
+
+body .current-box {
+    padding: 14px 16px;
+    margin-bottom: 16px;
+}
+
+/* 付款确认卡：行高收紧，整栏矮一点，跟左边套餐卡不至于差太多 */
+body .pay-box h3 {
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+}
+
+body .pay-row {
+    padding: 9px 0;
+}
+
+body .plate-section {
+    margin-top: 14px;
+    padding: 14px;
+}
+
+body .pay-method {
+    margin-top: 14px;
+    margin-bottom: 14px;
+}
+
+/* ---------- 图表 ---------- */
+/* 注意：柱子的高度是页面里写死的（最高 280px），容器不能比它矮，否则会把柱子裁掉 */
+body .bar-chart {
+    height: 300px;
+    gap: 40px;
+    padding: 12px 30px 0;
+}
+
+/* ---------- 滚动条 ---------- */
+body ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+body ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    background-clip: content-box;
+}
+
+body ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+    background-clip: content-box;
+}
+
+/* ========================= 响应式 ========================= */
+
+@media (max-width: 1240px) {
+    body .content {
+        padding: 16px 18px 32px;
+    }
+}
+
+/* 表格太宽时让它自己横向滚，不要顶出整页的横向滚动条 */
+@media (max-width: 1180px) {
+    body .content > table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 900px) {
+    body .main-layout {
+        flex-direction: column;
+    }
+
+    /* 小屏：侧边栏变成顶部横向标签条 */
+    body .sidebar {
+        position: static;
+        width: 100%;
+        flex: none;
+        height: auto;
+        overflow: visible;
+    }
+
+    body .sidebar ul {
+        display: flex;
+        overflow-x: auto;
+        padding: 0;
+    }
+
+    body .sidebar li {
+        flex: 0 0 auto;
+    }
+
+    body .sidebar li a {
+        border-left: none;
+        border-bottom: 3px solid transparent;
+        white-space: nowrap;
+        padding: 10px 14px;
+    }
+
+    body .sidebar li a.active {
+        border-bottom-color: #fff;
+    }
+
+    body .content {
+        padding: 14px 12px 28px;
+    }
+
+    body .stat-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    body .card-row {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 640px) {
+    body .content {
+        padding: 12px 10px 24px;
+    }
+
+    body .page-title {
+        font-size: 16px;
+    }
+
+    body .form-card,
+    body .settle-card {
+        padding: 14px;
+    }
+}
+
+/* ========================= 分页器 ========================= */
+
+.pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 13px;
+}
+
+.pager .pager-buttons {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.pager button {
+    min-width: 32px;
+    height: 30px;
+    padding: 0 9px;
+    border: 1px solid var(--app-line);
+    background: #fff;
+    border-radius: 8px;
+    color: #475569;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.pager button:hover:not(:disabled):not(.active) {
+    border-color: var(--pager-accent, #0ea5e9);
+    color: var(--pager-accent, #0ea5e9);
+}
+
+.pager button.active {
+    background: var(--pager-accent, #0ea5e9);
+    border-color: var(--pager-accent, #0ea5e9);
+    color: #fff;
+    font-weight: 600;
+}
+
+.pager button:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+.pager .pager-gap {
+    color: #cbd5e1;
+    padding: 0 2px;
+}
+
+.pager .pager-info {
+    color: #94a3b8;
+}
+
+/* 表格空数据行 */
+.empty-row {
+    text-align: center !important;
+    color: #94a3b8;
+    padding: 22px 0 !important;
+}
+
+/* ========================= 仪表盘 ========================= */
+
+.dash-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 14px;
+    margin-top: 14px;
+}
+
+@media (max-width: 1080px) {
+    .dash-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.chart-box h3 {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 14px;
+    margin-bottom: 10px;
+    color: #1e293b;
+}
+
+.chart-sub {
+    font-size: 12px;
+    font-weight: normal;
+    color: #94a3b8;
+}
+
+.chart-canvas {
+    width: 100%;
+}
+
+.chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 14px;
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: #64748b;
+}
+
+.chart-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chart-legend i {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+
+.chart-legend b {
+    color: #1f2937;
+}
+
+.chart-legend em {
+    font-style: normal;
+    color: #94a3b8;
+}
+
+.chart-empty {
+    padding: 40px 0;
+    text-align: center;
+    color: #cbd5e1;
+    font-size: 13px;
+}
+
+/* ========================= 车位网格 ========================= */
+body .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.spot-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.spot-tabs button {
+    border: 1px solid var(--app-line);
+    background: #fff;
+    color: #475569;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+
+.spot-tabs button:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+
+.spot-tabs button.active {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: #fff;
+    font-weight: 600;
+}
+
+.spot-tabs b {
+    margin-left: 5px;
+    font-weight: 600;
+    opacity: .85;
+}
+
+.spot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 10px;
+}
+
+.spot-cell {
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-radius);
+    background: #fff;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.spot-cell:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px -14px rgba(16, 24, 40, .55);
+}
+
+.spot-cell .cell-code {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    color: #1f2937;
+}
+
+.spot-cell .spot-type-tag {
+    float: right;
+    font-size: 11px;
+    font-weight: 400;
+    color: #94a3b8;
+}
+
+.spot-cell .cell-status {
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.spot-cell .cell-plate {
+    margin-top: 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.spot-cell .cell-time {
+    margin-top: 2px;
+    font-size: 11.5px;
+    color: #94a3b8;
+}
+
+.spot-cell.free {
+    border-color: #bbf7d0;
+    background: #f7fdf9;
+}
+
+.spot-cell.free .cell-status {
+    color: #16a34a;
+}
+
+.spot-cell.used {
+    border-color: #fecaca;
+    background: #fff8f8;
+}
+
+.spot-cell.used .cell-status {
+    color: #dc2626;
+}
+
+.spot-cell.repair {
+    border-color: #fde68a;
+    background: #fffcf3;
+}
+
+.spot-cell.repair .cell-status {
+    color: #b45309;
+}
+
+.spot-empty {
+    grid-column: 1 / -1;
+    padding: 40px 0;
+    text-align: center;
+    color: #cbd5e1;
+    font-size: 13px;
+}
+
+.spot-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+    font-size: 12.5px;
+    color: #64748b;
+}
+
+.spot-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.spot-legend i {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+
+/* ========================= Toast 轻提示 ========================= */
+
+#toastBox {
+    position: fixed;
+    right: 24px;
+    bottom: 96px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.toast {
+    max-width: 360px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #fff;
+    background: #334155;
+    box-shadow: 0 12px 28px -12px rgba(16, 24, 40, .55);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .2s ease, transform .2s ease;
+}
+
+.toast.in {
+    opacity: 1;
+    transform: none;
+}
+
+.toast.ok {
+    background: #16a34a;
+}
+
+.toast.err {
+    background: #dc2626;
+}
+
+.toast.info {
+    background: #334155;
+}
+
+/* ========================= 筛选输入框 ========================= */
+
+.filter-input {
+    width: 220px;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--app-line);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #334155;
+    outline: none;
+}
+
+.filter-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
+}
+
+/* ========================= 表单 / 按钮兜底 ========================= */
+/* 有些新页面不再写内联样式，这里给一组默认值，保证控件不掉皮 */
+
+body .form-group input,
+body .form-group select,
+body .form-group textarea {
+    border: 1px solid #dbe2ea;
+    background: #fff;
+    color: #334155;
+    outline: none;
+}
+
+body .form-group input:focus,
+body .form-group select:focus,
+body .form-group textarea:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, .1);
+}
+
+/* 设置类页面（费率 / 系统设置）的输入框撑满卡片宽度 */
+body .setting-card .form-group input,
+body .setting-card .form-group select {
+    width: 100%;
+}
+
+/* 状态标签兜底：各页原来各写一套，这里统一一份 */
+body .tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: nowrap;
+}
+
+body .tag-green {
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+}
+
+body .tag-blue {
+    background: #eff6ff;
+    color: #3b82f6;
+    border: 1px solid #bfdbfe;
+}
+
+body .tag-red {
+    background: #fef2f2;
+    color: #ef4444;
+    border: 1px solid #fecaca;
+}
+
+body .tag-orange {
+    background: #fff7ed;
+    color: #f97316;
+    border: 1px solid #fed7aa;
+}
+
+body .tag-gray {
+    background: #f8fafc;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
+/* ========================= 弹窗 ========================= */
+
+.modal-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, .45);
+}
+
+.modal-mask.open {
+    display: flex;
+}
+
+.modal {
+    width: 420px;
+    max-width: 100%;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 30px 60px -20px rgba(2, 6, 23, .55);
+    animation: modalIn .16s ease-out;
+}
+
+@keyframes modalIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.modal-head h3 {
+    font-size: 15px;
+    color: #1e293b;
+}
+
+.modal-close {
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 15px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px;
+}
+
+.modal-close:hover {
+    color: #475569;
+}
+
+.modal-body {
+    padding: 16px 18px 4px;
+}
+
+.modal-body .form-group {
+    margin-bottom: 12px;
+}
+
+.modal-body .form-group input,
+.modal-body .form-group select {
+    width: 100%;
+}
+
+.modal-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px 16px;
+}
+
+body .btn-danger {
+    background: #ef4444;
+    color: #fff;
+}
+
+body .btn-danger:hover {
+    background: #dc2626;
+}
+
+/* ========================= 报表里的迷你条形图 ========================= */
+.bar-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bar-cell i {
+    display: block;
+    flex: 0 0 auto;
+    height: 7px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #3b82f6, #93c5fd);
+}
+
+.bar-cell span {
+    color: #334155;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ========================= 只读信息列表（系统设置页） ========================= */
+
+.info-list {
+    border-top: 1px solid #f0f3f8;
+}
+
+.info-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 11px 2px;
+    border-bottom: 1px solid #f0f3f8;
+    font-size: 13.5px;
+}
+
+.info-row .k {
+    flex: none;
+    width: 140px;
+    color: #64748b;
+}
+
+.info-row .v {
+    flex: 1;
+    color: #1f2937;
+    font-weight: 600;
+}
+
+body .btn-primary {
+    background: #3b82f6;
+    color: #fff;
+}
+
+body .btn-primary:hover {
+    background: #2563eb;
+}
+
+body .btn-default {
+    background: #fff;
+    color: #475569;
+    border: 1px solid #dbe2ea;
+}
+
+body .btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+body .setting-card h3 {
+    font-size: 15px;
+    color: #1e293b;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f0f3f8;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
