@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>停车记录查询 - 停车场管理系统</title>
+    <script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+    <script>
+        $(document).ready(function () {
+            // ===== 自动高亮当前导航项（点谁谁变色，其他还原）=====
+            var currentPath = window.location.pathname;
+            var currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1).split('?')[0];
+            var navMap = {
+                'dashboard.html': 'li1',
+                'spots.html': 'li2',
+                'rules.html': 'li3',
+                'records.html': 'li4',
+                'members.html': 'li5',
+                'reports.html': 'li6',
+                'settings.html': 'li7'
+            };
+            if (navMap[currentPage]) {
+                $("[name=" + navMap[currentPage] + "] a").addClass("active");
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            const username = params.get('username');
+            let userid = null; // 提升到外层作用域         // 侧边栏页面跳转
+            function bindSideBar(){
+                $("[name=li1]").click(function () {
+                    window.location.href = "dashboard.html?username="+username;
+                })
+                $("[name=li2]").click(function () {
+                    window.location.href = "spots.html?username="+username;
+                })
+                $("[name=li3]").click(function () {
+                    window.location.href = "rules.html?username="+username;
+                })
+                $("[name=li4]").click(function () {
+                    window.location.href = "records.html?username="+username;
+                })
+                $("[name=li5]").click(function () {
+                    window.location.href = "members.html?username="+username;
+                })
+                $("[name=li6]").click(function () {
+                    window.location.href = "reports.html?username="+username;
+                })
+                $("[name=li7]").click(function () {
+                    window.location.href = "settings.html?username="+username;
+                })
+            }
+            bindSideBar();
+        })
+    </script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif; background: #f0f2f5; color: #333; }
+  a { text-decoration: none; color: inherit; }
+  button { font-family: inherit; }
+  input, select { font-family: inherit; }
+
+  .topbar {
+    height: 60px; background: #1e3a8a; color: #fff;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 100;
+  }
+  .topbar .logo { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+  .topbar .user-info { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+  .topbar .user-info .role-tag { background: #3b82f6; padding: 2px 10px; border-radius: 10px; font-size: 12px; }
+  .logout-btn {
+    background: #ef4444; color: #fff; border: none; padding: 6px 16px; border-radius: 4px;
+    font-size: 13px; display: inline-block;
+  }
+  .logout-btn:hover { background: #dc2626; }
+
+  .main-layout { display: flex; min-height: calc(100vh - 60px); }
+  .sidebar { width: 220px; background: #1e293b; flex-shrink: 0; }
+  .sidebar ul { list-style: none; padding-top: 10px; }
+  .sidebar li a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 24px; color: #cbd5e1; font-size: 14px;
+    border-left: 3px solid transparent; transition: all .2s;
+  }
+  .sidebar li a:hover { background: #334155; color: #fff; }
+  .sidebar li a.active { background: #3b82f6; color: #fff; border-left-color: #fff; }
+  .sidebar li .icon { width: 18px; text-align: center; }
+
+  .content { flex: 1; padding: 24px; }
+  .page-title { font-size: 20px; margin-bottom: 20px; color: #333; border-left: 4px solid #3b82f6; padding-left: 12px; }
+
+  .btn { padding: 8px 16px; border: none; border-radius: 4px; font-size: 13px; display: inline-block; cursor: default; }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-default { background: #fff; color: #555; border: 1px solid #d9d9d9; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  thead { background: #f8fafc; }
+  th, td { padding: 12px 14px; text-align: left; font-size: 14px; border-bottom: 1px solid #f0f0f0; }
+  th { color: #475569; font-weight: 600; }
+  tbody tr:hover { background: #f0f9ff; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; }
+  .tag-blue { background: #eff6ff; color: #3b82f6; border: 1px solid #bfdbfe; }
+  .tag-gray { background: #f5f5f5; color: #999; border: 1px solid #d9d9d9; }
+  .filter-bar { background: #fff; padding: 16px; border-radius: 8px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .filter-bar input, .filter-bar select { padding: 7px 10px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 13px; }
+</style>
+    <link rel="stylesheet" type="text/css" href="../css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🅿️ 停车场管理系统</div>
+  <div class="user-info">
+    <span>系统管理员</span>
+    <span class="role-tag">管理员</span>
+    <a href="SysUser/logout" class="logout-btn">退出登录</a>
+  </div>
+</div>
+
+<div class="main-layout">
+  <div class="sidebar">
+    <ul>
+        <li name="li1"><a><span class="icon">📊</span><span>首页仪表盘</span></a></li>
+        <li name="li2"><a><span class="icon">🅿️</span><span>车位管理</span></a></li>
+        <li name="li3"><a><span class="icon">💰</span><span>费率规则管理</span></a></li>
+        <li name="li4"><a><span class="icon">📋</span><span>停车记录查询</span></a></li>
+        <li name="li5"><a><span class="icon">💳</span><span>会员管理</span></a></li>
+        <li name="li6"><a><span class="icon">📈</span><span>收费统计报表</span></a></li>
+        <li name="li7"><a><span class="icon">⚙️</span><span>系统设置</span></a></li>
+    </ul>
+  </div>
+
+  <div class="content">
+    <h2 class="page-title">停车记录查询</h2>
+
+    <div class="filter-bar">
+      <input type="text" id="kw" class="filter-input" placeholder="车牌号 / 车位号">
+      <input type="date" id="dateFrom" class="filter-input" style="width:160px;">
+      <div class="spot-tabs" id="statusTabs">
+        <button type="button" class="active" data-status="all">全部</button>
+        <button type="button" data-status="停车中">在场</button>
+        <button type="button" data-status="已结算">已出场</button>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btnQuery">查询</button>
+      <button class="btn btn-default btn-sm" id="btnReset">重置</button>
+      <span class="chart-sub" name="updatedAt"></span>
+    </div>
+
+    <table>
+      <thead>
+      <tr>
+        <th>车牌号</th>
+        <th>车位</th>
+        <th>入场时间</th>
+        <th>出场时间</th>
+        <th>停放时长</th>
+        <th>费用(元)</th>
+        <th>状态</th>
+      </tr>
+      </thead>
+      <tbody name="body"></tbody>
+    </table>
+    <div id="pager" class="pager"></div>
+  </div>
+</div>
+
+<script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+<script type="text/javascript" src="../js/toast.js"></script>
+<script type="text/javascript" src="../js/admin-shell.js"></script>
+<script>
+  (function () {
+    var PAGE_SIZE = 10;
+    var all = [];          // 原始数据（id 倒序，最新在前）
+    var filtered = [];     // 过滤后的
+    var page = 1;
+    var status = 'all';
+
+    function fmtMoney(v) {
+      if (v === null || v === undefined) return '0.00';
+      return Number(v).toFixed(2);
+    }
+
+    function fmtDuration(minutes) {
+      if (minutes === null || minutes === undefined) return '-';
+      var h = Math.floor(minutes / 60);
+      var m = minutes % 60;
+      return h > 0 ? h + ' 小时 ' + m + ' 分' : m + ' 分钟';
+    }
+
+    function applyFilter() {
+      var kw = ($('#kw').val() || '').trim().toLowerCase();
+      var from = $('#dateFrom').val();
+
+      filtered = all.filter(function (r) {
+        if (status !== 'all' && r.status !== status) return false;
+        if (kw) {
+          var text = (r.platenumber + ' ' + r.spotcode).toLowerCase();
+          if (text.indexOf(kw) < 0) return false;
+        }
+        if (from && (r.entrytime || '').substring(0, 10) < from) return false;
+        return true;
+      });
+      page = 1;
+      render();
+    }
+
+    function render() {
+      var $body = $('[name=body]').empty();
+      if (filtered.length === 0) {
+        $("<tr><td colspan='7' class='empty-row'>没有符合条件的记录</td></tr>").appendTo($body);
+        $('#pager').empty();
+        return;
+      }
+      var totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+      page = Math.min(Math.max(1, page), totalPages);
+      var start = (page - 1) * PAGE_SIZE;
+
+      filtered.slice(start, start + PAGE_SIZE).forEach(function (r) {
+        var cls = r.status === '停车中' ? 'tag-blue' : 'tag-green';
+        $('<tr>'
+          + '<td>' + r.platenumber + '</td>'
+          + '<td>' + r.spotcode + '</td>'
+          + '<td>' + (r.entrytime || '-') + '</td>'
+          + '<td>' + (r.exittime || '-') + '</td>'
+          + '<td>' + fmtDuration(r.duration) + '</td>'
+          + '<td>' + fmtMoney(r.fee) + '</td>'
+          + '<td><span class="tag ' + cls + '">' + (r.status === '停车中' ? '在场' : '已出场') + '</span></td>'
+          + '</tr>').appendTo($body);
+      });
+
+      var $pager = $('#pager').empty();
+      var $buttons = $("<div class='pager-buttons'></div>");
+      $("<button type='button'>上一页</button>").prop('disabled', page === 1)
+        .click(function () { page--; render(); }).appendTo($buttons);
+      for (var i = 1; i <= totalPages; i++) {
+        (function (p) {
+          $("<button type='button'></button>").text(p).addClass(p === page ? 'active' : '')
+            .click(function () { page = p; render(); }).appendTo($buttons);
+        })(i);
+      }
+      $("<button type='button'>下一页</button>").prop('disabled', page === totalPages)
+        .click(function () { page++; render(); }).appendTo($buttons);
+      $pager.append($buttons);
+      $pager.append($("<span class='pager-info'></span>")
+        .text('共 ' + filtered.length + ' 条，第 ' + page + ' / ' + totalPages + ' 页'));
+    }
+
+    function load() {
+      fetch('ParkingRecord/all')
+        .then(function (r) { return r.json(); })
+        .then(function (list) {
+          all = (list || []).slice().reverse();
+          $('[name=updatedAt]').text('更新于 ' + new Date().toLocaleTimeString());
+          applyFilter();
+        })
+        .catch(function () {
+          $('[name=updatedAt]').text('加载失败');
+          toast('停车记录加载失败', 'err');
+        });
+    }
+
+    $(document).ready(function () {
+      bindNav('records');
+      $('#statusTabs').on('click', 'button', function () {
+        status = $(this).attr('data-status');
+        $('#statusTabs button').removeClass('active');
+        $(this).addClass('active');
+        applyFilter();
+      });
+      $('#btnQuery').click(applyFilter);
+      $('#kw').on('input', applyFilter);
+      $('#dateFrom').on('change', applyFilter);
+      $('#btnReset').click(function () {
+        $('#kw').val('');
+        $('#dateFrom').val('');
+        status = 'all';
+        $('#statusTabs button').removeClass('active').first().addClass('active');
+        applyFilter();
+      });
+      load();
+    });
+  })();
+</script>
+</body>
+</html>

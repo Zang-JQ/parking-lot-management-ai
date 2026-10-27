@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的停车记录 - 停车场管理系统</title>
+    <script type="text/javascript" src="../js/jquery-1.8.3.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            // ===== 自动高亮当前导航项（点谁谁变色，其他还原）=====
+            var currentPath = window.location.pathname;
+            var currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1).split('?')[0];
+            var navMap = {
+                'userSpots.html': 'li1',
+                'userEntry.html': 'li2',
+                'userExit.html': 'li3',
+                'userRecords.html': 'li4',
+                'userMembership.html': 'li5'
+            };
+            if (navMap[currentPage]) {
+                $("[name=" + navMap[currentPage] + "] a").addClass("active");
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            const username = params.get('username');
+            let userid = null; // 提升到外层作用域
+            // 侧边栏跳转
+            $("[name=li1]").click(function () {
+                window.location.href = "userSpots.html?username="+username;
+            })
+            $("[name=li2]").click(function () {
+                window.location.href = "userEntry.html?username="+username;
+            })
+            $("[name=li3]").click(function () {
+                window.location.href = "userExit.html?username="+username;
+            })
+            $("[name=li4]").click(function () {
+                window.location.href = "userRecords.html?username="+username;
+            })
+            $("[name=li5]").click(function () {
+                window.location.href = "userMembership.html?username="+username;
+            })
+            $.get("SysUser/findByUsername",{"username":username},function(data){
+                $("[name=realname]").text(data.t.realname);
+                userid= data.t.id;
+                findParkingRecord();
+            })
+            /*=======================================================================*/
+            /* 停车记录分页：每页 5 条 */
+            var PAGE_SIZE = 5;
+            var allRecords = [];     // 倒序存放，最新的在最前
+            var currentPage = 1;
+
+            function formatFee(fee){
+                if(fee === null || fee === undefined){
+                    return "0.00 元";
+                }
+                return Number(fee).toFixed(2) + " 元";
+            }
+
+            function findParkingRecord(){
+                $.get("ParkingRecord/findByUserid",{"userid":userid},function (data){
+                    // 接口按 id 升序返回，这里倒过来让最新的排最前
+                    allRecords = (data || []).slice().reverse();
+                    currentPage = 1;
+                    renderSummary();
+                    renderRecordPage();
+                })
+            }
+
+            function renderRecordPage(){
+                const $tbody = $("tbody");
+                $tbody.empty();
+
+                if(allRecords.length === 0){
+                    $("<tr><td colspan='7' class='empty-row'>--暂无停车信息--</td></tr>").appendTo($tbody);
+                    renderPager();
+                    return;
+                }
+
+                const totalPages = Math.ceil(allRecords.length / PAGE_SIZE);
+                currentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+                const start = (currentPage - 1) * PAGE_SIZE;
+                allRecords.slice(start, start + PAGE_SIZE).forEach(function(item){
+                    let spanStyle = "";
+                    if(item.status === "停车中"){
+                        spanStyle = "display: inline-block;padding: 2px 10px;border-radius: 10px;font-size: 12px;background: #eff6ff;color: #3b82f6;border: 1px solid #bfdbfe;";
+                    }else if(item.status === "已结算"){
+                        spanStyle = "display: inline-block;padding: 2px 10px;border-radius: 10px;font-size: 12px;background: #f0fdf4;color: #22c55e;border: 1px solid #bbf7d0;";
+                    }
+                    $("<tr>\n" +
+                        "<td>" + item.platenumber + "</td>\n" +
+                        "<td>" + item.spotcode + "</td>\n" +
+                        "<td>" + item.entrytime + "</td>\n" +
+                        "<td>" + (item.exittime == null ? "-" : item.exittime) + "</td>\n" +
+                        "<td>" + (item.duration == null ? "-" : item.duration) + "</td>\n" +
+                        "<td>" + formatFee(item.fee) + "</td>\n" +
+                        "<td><span style='" + spanStyle + "'>" + item.status + "</span></td>\n" +
+                        "</tr>").appendTo($tbody);
+                });
+
+                renderPager();
+            }
+
+            /* 页码序列：页数多时折叠成 1 … 4 5 6 … 12 */
+            function buildPageNumbers(current, total){
+                if(total <= 7){
+                    const arr = [];
+                    for(let i = 1; i <= total; i++){ arr.push(i); }
+                    return arr;
+                }
+                const arr = [1];
+                const start = Math.max(2, current - 1);
+                const end = Math.min(total - 1, current + 1);
+                if(start > 2){ arr.push("..."); }
+                for(let i = start; i <= end; i++){ arr.push(i); }
+                if(end < total - 1){ arr.push("..."); }
+                arr.push(total);
+                return arr;
+            }
+
+            function renderPager(){
+                const $pager = $("#pager").empty();
+                if(allRecords.length === 0){
+                    return;
+                }
+                const totalPages = Math.ceil(allRecords.length / PAGE_SIZE);
+                const $buttons = $("<div class='pager-buttons'></div>");
+
+                $("<button type='button'>上一页</button>")
+                    .prop("disabled", currentPage === 1)
+                    .click(function(){ currentPage--; renderRecordPage(); })
+                    .appendTo($buttons);
+
+                buildPageNumbers(currentPage, totalPages).forEach(function(p){
+                    if(p === "..."){
+                        $("<span class='pager-gap'>…</span>").appendTo($buttons);
+                        return;
+                    }
+                    $("<button type='button'></button>")
+                        .text(p)
+                        .addClass(p === currentPage ? "active" : "")
+                        .click(function(){ currentPage = p; renderRecordPage(); })
+                        .appendTo($buttons);
+                });
+
+                $("<button type='button'>下一页</button>")
+                    .prop("disabled", currentPage === totalPages)
+                    .click(function(){ currentPage++; renderRecordPage(); })
+                    .appendTo($buttons);
+
+                $pager.append($buttons);
+                $pager.append($("<span class='pager-info'></span>")
+                    .text("共 " + allRecords.length + " 条，第 " + currentPage + " / " + totalPages + " 页"));
+            }
+            /* 汇总卡片：全部记录已经取回，直接算，省掉两个接口请求 */
+            function currentMonthPrefix(){
+                const d = new Date();
+                const m = d.getMonth() + 1;
+                return d.getFullYear() + "-" + (m < 10 ? "0" + m : m);
+            }
+
+            function renderSummary(){
+                const prefix = currentMonthPrefix();
+                let totalFee = 0;
+                let monthCount = 0;
+                allRecords.forEach(function(item){
+                    totalFee += (item.fee === null || item.fee === undefined) ? 0 : Number(item.fee);
+                    if(item.entrytime && String(item.entrytime).indexOf(prefix) === 0){
+                        monthCount++;
+                    }
+                });
+                $("[name=count]").text(allRecords.length + " 次");
+                $("[name=sum]").text("¥ " + totalFee.toFixed(2));
+                $("[name=monthCount]").text(monthCount + " 次");
+            }
+
+        });
+
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        button {
+            font-family: inherit;
+        }
+
+        input, select {
+            font-family: inherit;
+        }
+
+        .topbar {
+            height: 60px;
+            background: #0ea5e9;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+        }
+
+        .topbar .logo {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .topbar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 14px;
+        }
+
+        .topbar .user-info .role-tag {
+            background: #0369a1;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .logout-btn {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: inline-block;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .main-layout {
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 220px;
+            background: #1e293b;
+            flex-shrink: 0;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding-top: 10px;
+        }
+
+        .sidebar li a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 24px;
+            color: #cbd5e1;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+            transition: all .2s;
+        }
+
+        .sidebar li a:hover {
+            background: #334155;
+            color: #fff;
+        }
+
+        .sidebar li a.active {
+            background: #0ea5e9;
+            color: #fff;
+            border-left-color: #fff;
+        }
+
+        .sidebar li .icon {
+            width: 18px;
+            text-align: center;
+        }
+
+        .content {
+            flex: 1;
+            padding: 24px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+            border-left: 4px solid #0ea5e9;
+            padding-left: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        thead {
+            background: #f8fafc;
+        }
+
+        th, td {
+            padding: 12px 14px;
+            text-align: left;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        th {
+            color: #475569;
+            font-weight: 600;
+        }
+
+        tbody tr:hover {
+            background: #f0f9ff;
+        }
+
+        .filter-bar input, .filter-bar select {
+            padding: 7px 10px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .sum-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            text-align: center;
+        }
+
+        .sum-card .label {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+
+        .sum-card .value {
+            font-size: 22px;
+            font-weight: bold;
+            color: #0ea5e9;
+        }
+    </style>
+    <link rel="stylesheet" type="text/css" href="../css/app.css">
+</head>
+<body>
+
+<div class="topbar">
+    <div class="logo">🅿️ 停车场管理系统</div>
+    <div class="user-info">
+        <span name="realname"></span>
+        <span class="role-tag">普通用户</span>
+        <a href="SysUser/logout" class="logout-btn">退出登录</a>
+    </div>
+</div>
+
+<div class="main-layout">
+    <div class="sidebar">
+        <ul>
+            <li name="li1"><a><span>🅿️</span><span>车位查询</span></a></li>
+            <li name="li2"><a><span>➡️</span><span>车辆入场登记</span></a></li>
+            <li name="li3"><a><span>⬅️</span><span>车辆出场结算</span></a></li>
+            <li name="li4"><a><span>📋</span><span>我的停车记录</span></a></li>
+            <li name="li5"><a><span>💳</span><span>充值会员</span></a></li>
+        </ul>
+    </div>
+
+    <div class="content">
+        <h2 class="page-title">我的停车记录</h2>
+
+        <!-- 我的消费汇总 -->
+        <div class="summary-cards">
+            <div class="sum-card">
+                <div class="label">累计停车次数</div>
+                <div name="count" class="value">0 次</div>
+            </div>
+            <div class="sum-card">
+                <div class="label">累计消费金额</div>
+                <div name="sum" class="value">¥ 0.00</div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+            <tr>
+                <th>车牌号</th>
+                <th>车位</th>
+                <th>入场时间</th>
+                <th>出场时间</th>
+                <th>停放时长</th>
+                <th>费用(元)</th>
+                <th>状态</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <div id="pager" class="pager"></div>
+    </div>
+</div>
+
+<script type="text/javascript" src="../js/assistant.js"></script>
+</body>
+</html>

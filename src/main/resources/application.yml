@@ -1,0 +1,78 @@
+server:
+  port: 8899
+
+spring:
+  # 车牌识别需要上传照片：Spring 默认单文件上限 1MB，手机照片必然超，会直接 413
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+  data:
+    redis:
+      # 超时要短：缓存嘛，宁可不用也不能把请求拖住。
+      # 默认 60 秒太长，Redis 一挂每个请求都会卡满一分钟。
+      timeout: 800ms
+      connect-timeout: 1s
+      lettuce:
+        shutdown-timeout: 100ms
+        cluster:
+          refresh:
+            adaptive: true
+            period: 30s
+      cluster:
+        nodes:
+        - 192.168.126.128:7000
+        - 192.168.126.128:7001
+        - 192.168.126.128:7002
+        - 192.168.126.128:7003
+        - 192.168.126.128:7004
+        - 192.168.126.128:7005
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/aaa?useSSL=false&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+mybatis:
+  type-aliases-package: com.jr.entity
+  mapper-locations: classpath:com/jr/mapper/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# ===== 缓存降级策略 =====
+app:
+  redis:
+    # Redis 调用失败后，多少秒内不再尝试（熔断窗口）
+    # 期间车位查询直接走本地缓存/数据库，避免每个请求都等超时
+    fail-open-seconds: 30
+
+# ===== 车牌识别（LangChain4j 多模态）=====
+# 走「OpenAI 兼容」协议，所以换成智谱/其它平台时只改 base-url + model-name 即可
+vision:
+  enabled: true
+  # 阿里云百炼（兼容模式）；也可换成 https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+  base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  # 优先读环境变量 aliQwen-api（本机已设置），再回退到 DASHSCOPE_API_KEY；都没有则识别接口降级提示
+  # **不要把真实 key 写死在这里，也不要提交进 git**
+  api-key: ${aliQwen-api:${DASHSCOPE_API_KEY:}}
+  # 视觉模型：qwen3-vl-plus（新）/ qwen-vl-max（旧）
+  model-name: qwen3-vl-plus
+  # 单次请求超时（秒）：图片推理通常 3~15 秒
+  timeout-seconds: 60
+  max-retries: 1
+
+# ===== AI 业务助手（文本模型 + 工具调用）=====
+# 和视觉识别共用同一个 key，只是换成支持 function calling 的文本模型
+ai:
+  chat:
+    enabled: true
+    base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api-key: ${aliQwen-api:${DASHSCOPE_API_KEY:}}
+    # qwen-plus 支持工具调用（function calling），够本项目用且便宜；
+    # 想更强可换 qwen3-max / qwen-max
+    model-name: qwen-plus
+    timeout-seconds: 45
+    max-retries: 1
+    # 会话记忆：空闲超过 N 分钟自动清理；后台每 10 分钟扫一次
+    memory-idle-minutes: 30
+    memory-sweep-ms: 600000
